@@ -1,0 +1,108 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user personal information, education, experience, and job preferences.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "dob": { "type": "string", "format": "date" },
+        "experience": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "company": { "type": "string" },
+              "role": { "type": "string" },
+              "startDate": { "type": "string" },
+              "endDate": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "education": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "school": { "type": "string" },
+              "degree": { "type": "string" },
+              "major": { "type": "string" },
+              "graduationDate": { "type": "string" }
+            }
+          }
+        },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "preferences": {
+          "type": "object",
+          "properties": {
+            "roles": { "type": "array", "items": { "type": "string" } },
+            "workType": { "type": "string", "enum": ["In-person", "Remote", "Hybrid"] },
+            "radius": { "type": "number" },
+            "basePay": { "type": "number" }
+          }
+        }
+      },
+      "required": ["fullName", "email"]
+    },
+    "Job": {
+      "title": "Job Listing",
+      "description": "Represents a job opportunity pulled from various sources.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "company": { "type": "string" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "source": { "type": "string" },
+        "pay": { "type": "string" },
+        "postedDate": { "type": "string", "format": "date-time" }
+      }
+    },
+    "UserJob": {
+      "title": "User Job Interaction",
+      "description": "Tracks jobs saved or applied to by a user.",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string" },
+        "status": { "type": "string", "enum": ["saved", "applied"] },
+        "savedAt": { "type": "string", "format": "date-time" },
+        "resumeId": { "type": "string" },
+        "coverLetterId": { "type": "string" }
+      }
+    },
+    "Document": {
+      "title": "User Document",
+      "description": "Stores AI-generated resumes, cover letters, or uploaded transcripts.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["resume", "cover-letter", "transcript"] },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "jobId": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile data."
+    },
+    "/jobs/{jobId}": {
+      "schema": "Job",
+      "description": "Global job listings."
+    },
+    "/users/{userId}/saved_jobs/{jobId}": {
+      "schema": "UserJob",
+      "description": "Jobs saved or applied to by the user."
+    },
+    "/users/{userId}/documents/{docId}": {
+      "schema": "Document",
+      "description": "User's generated or uploaded documents."
+    }
+  }
+}

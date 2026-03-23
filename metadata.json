@@ -1,0 +1,9 @@
+{
+  "name": "CareerPath AI",
+  "description": "AI-powered career navigation platform for students to find jobs, optimize resumes, and get career advice.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

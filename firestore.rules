@@ -1,0 +1,140 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (Auth UID)
+    // Fields:
+    //   - fullName: string (required)
+    //   - email: string (required, email format)
+    //   - phone: string (optional)
+    //   - address: string (optional)
+    //   - photoURL: string (optional, URL format)
+    //   - dob: string (optional, date format)
+    //   - experience: list of maps (optional)
+    //   - education: list of maps (optional)
+    //   - skills: list of strings (optional)
+    //   - preferences: map (optional)
+    //
+    // Collection: jobs
+    // Document ID: jobId
+    // Fields:
+    //   - title: string (required)
+    //   - company: string (required)
+    //   - location: string (required)
+    //   - description: string (required)
+    //   - source: string (required)
+    //   - pay: string (optional)
+    //   - postedDate: timestamp (required)
+    //
+    // Collection: users/{userId}/saved_jobs
+    // Document ID: jobId
+    // Fields:
+    //   - jobId: string (required)
+    //   - status: string (required, 'saved' or 'applied')
+    //   - savedAt: timestamp (required)
+    //   - resumeId: string (optional)
+    //   - coverLetterId: string (optional)
+    //
+    // Collection: users/{userId}/documents
+    // Document ID: docId
+    // Fields:
+    //   - type: string (required, 'resume', 'cover-letter', 'transcript')
+    //   - content: string (required)
+    //   - createdAt: timestamp (required)
+    //   - jobId: string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.fullName is string && data.fullName.size() > 0 && data.fullName.size() < 100 &&
+             isValidEmail(data.email) &&
+             (!('photoURL' in data) || isValidUrl(data.photoURL));
+    }
+
+    function isValidJob(data) {
+      return data.title is string && data.title.size() > 0 &&
+             data.company is string && data.company.size() > 0;
+    }
+
+    function isValidUserJob(data) {
+      return data.jobId is string &&
+             data.status in ['saved', 'applied'];
+    }
+
+    function isValidDocument(data) {
+      return data.type in ['resume', 'cover-letter', 'transcript'] &&
+             data.content is string && data.content.size() > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && hasRequiredFields(['fullName', 'email']);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      
+      // Saved Jobs subcollection
+      match /saved_jobs/{jobId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidUserJob(request.resource.data);
+        allow update: if isOwner(userId) && isValidUserJob(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // Documents subcollection
+      match /documents/{docId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidDocument(request.resource.data);
+        allow update: if isOwner(userId) && isValidDocument(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // Jobs collection (Publicly readable, but only admin/system can write)
+    match /jobs/{jobId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // System-only for now
+    }
+  }
+}
