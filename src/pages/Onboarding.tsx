@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogIn, UserPlus, Briefcase, GraduationCap, Target, ChevronRight, ChevronLeft, Linkedin, Mail, Lock, Sparkles, ArrowRight } from 'lucide-react';
 import { auth, googleProvider, signInWithPopup, db, doc, setDoc, createUserWithEmailAndPassword, signInWithEmailAndPassword } from '../firebase';
+import { useNavigate } from 'react-router-dom';
 
 export default function Onboarding() {
   const [view, setView] = useState<'hero' | 'auth' | 'onboarding'>('hero');
@@ -11,6 +12,7 @@ export default function Onboarding() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState<any>({
     fullName: '',
@@ -126,7 +128,10 @@ export default function Onboarding() {
               <span className="relative">Get Started Free</span>
               <ArrowRight className="relative group-hover:translate-x-1 transition-transform" size={20} />
             </button>
-            <button className="text-stone-500 font-bold hover:text-stone-900 transition-colors flex items-center space-x-2">
+            <button
+              onClick={() => navigate('/how-it-works')}
+              className="text-stone-500 font-bold hover:text-stone-900 transition-colors flex items-center space-x-2"
+            >
               <span>See How It Works</span>
               <div className="w-1.5 h-1.5 rounded-full bg-stone-300" />
             </button>

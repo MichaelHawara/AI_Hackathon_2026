@@ -8,6 +8,7 @@ import MyJobs from './pages/MyJobs';
 import Documents from './pages/Documents';
 import Account from './pages/Account';
 import Onboarding from './pages/Onboarding';
+import HowItWorks from './pages/HowItWorks';
 import Chatbot from './components/Chatbot';
 
 export default function App() {
@@ -60,6 +61,7 @@ export default function App() {
             <Route path="/my-jobs" element={showHome ? <MyJobs /> : <Navigate to="/" />} />
             <Route path="/documents" element={showHome ? <Documents /> : <Navigate to="/" />} />
             <Route path="/account" element={showHome ? <Account /> : <Navigate to="/" />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
           </Routes>
         </main>
         {showHome && <Chatbot />}
