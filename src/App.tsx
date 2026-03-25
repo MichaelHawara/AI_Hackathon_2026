@@ -11,6 +11,8 @@ import Onboarding from './pages/Onboarding';
 import Chatbot from './components/Chatbot';
 
 export default function App() {
+  console.log('App component is loading...');
+
   const [user, setUser] = useState<any>(null);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,8 +54,8 @@ export default function App() {
         <main className={showHome ? "pt-16 pb-20 px-4 max-w-7xl mx-auto" : ""}>
           <Routes>
             <Route path="/" element={
-              !user ? <Onboarding /> : 
-              showOnboarding ? <Onboarding /> : 
+              !user ? <Onboarding /> :
+              showOnboarding ? <Onboarding /> :
               <Home />
             } />
             <Route path="/search" element={showHome ? <Search /> : <Navigate to="/" />} />

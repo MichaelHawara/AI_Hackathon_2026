@@ -1,10 +1,9 @@
 {
-  "projectId": "gdg-wine-codelab",
-  "appId": "1:535707349728:web:13649f26d7dc31bc069685",
-  "apiKey": "AIzaSyA2_WwfsXjIpKiDzzvPWjB_1UllSgin-XU",
-  "authDomain": "gdg-wine-codelab.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-4cdb0d55-f037-489a-b3b9-6216744da8d5",
-  "storageBucket": "gdg-wine-codelab.firebasestorage.app",
-  "messagingSenderId": "535707349728",
-  "measurementId": ""
+  "apiKey": "AIzaSyDRVslyfTucOUb8Jle5tXLajQuwoUIMGoI",
+  "authDomain": "ai-hackathon-2026-70c99.firebaseapp.com",
+  "projectId": "ai-hackathon-2026-70c99",
+  "storageBucket": "ai-hackathon-2026-70c99.firebasestorage.app",
+  "messagingSenderId": "857931005645",
+  "appId": "1:857931005645:web:2c843569a33fb1a7f1b384",
+  "firestoreDatabaseId": "G-HY4RV8R9MH"
 }
