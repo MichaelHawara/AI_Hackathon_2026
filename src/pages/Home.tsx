@@ -214,6 +214,8 @@ export default function Home() {
         job={selectedJob} 
         onClose={() => setSelectedJob(null)} 
         userProfile={userProfile}
+        isSaved={selectedJob ? savedJobIds.has(selectedJob.id) : false}
+        onSaveToggle={toggleSave}
       />
     </div>
   );

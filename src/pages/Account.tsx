@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Calendar, Award, BookOpen, Settings, Save, Linkedin } from 'lucide-react';
-import { db, auth, doc, getDoc, updateDoc } from '../firebase';
+import { User, Mail, Phone, MapPin, Calendar, Award, BookOpen, Settings, Save, Linkedin, Plus, X, Edit2, LogOut } from 'lucide-react';
+import { db, auth, doc, getDoc, updateDoc, signOut } from '../firebase';
 import { UserProfile } from '../types';
 
 export default function Account() {
@@ -37,20 +37,37 @@ export default function Account() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
+
   if (loading) return <div className="animate-pulse space-y-8"><div className="h-40 bg-stone-200 rounded-3xl"></div></div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <header className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-stone-900 tracking-tight">My Profile</h1>
-        <button
-          onClick={handleUpdate}
-          disabled={saving}
-          className="flex items-center space-x-2 bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
-        >
-          <Save size={18} />
-          <span>{saving ? 'Saving...' : 'Save Changes'}</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={handleUpdate}
+            disabled={saving}
+            className="flex items-center space-x-2 bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
+          >
+            <Save size={18} />
+            <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-2 bg-red-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-100"
+          >
+            <LogOut size={18} />
+            <span>Logout</span>
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
