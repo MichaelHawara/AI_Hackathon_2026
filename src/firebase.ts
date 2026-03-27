@@ -4,7 +4,7 @@ import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, qu
 
 // Firebase configuration - temporarily hardcoded for testing
 const firebaseConfig = {
-  apiKey: "AIzaSyDRVslyfTucOUb8Jle5tXLajQuwoUIMGoI",
+  apiKey: "AIzaSyAW9Jx6Ur1ltrLTFMyVSYW5LFT6pfolFiw",
   authDomain: "ai-hackathon-2026-70c99.firebaseapp.com",
   projectId: "ai-hackathon-2026-70c99",
   storageBucket: "ai-hackathon-2026-70c99.firebasestorage.app",

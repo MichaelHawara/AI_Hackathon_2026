@@ -1,16 +1,19 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-const MODEL = "gemini-2.0-flash";
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-/**
- * Career Assistant Chat
- */
-export async function getCareerAdvice(message: string, userProfile: any) {
-  const systemInstruction = `
+if (!apiKey) {
+  throw new Error(
+    "VITE_GEMINI_API_KEY is not configured. Please add it to your .env.local file. " +
+    "Get your API key from: https://aistudio.google.com/app/apikey"
+  );
+}
+
+const genAI = new GoogleGenerativeAI(apiKey);
+const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
+
+const SYSTEM_INSTRUCTION = `
 You are CareerPath AI, an expert Career Assistant built specifically for students navigating the workforce.
-
-User Profile: ${JSON.stringify(userProfile)}
 
 Your capabilities:
 - Answer questions about what specific jobs/roles require
@@ -21,15 +24,17 @@ Your capabilities:
 - Guide students through career exploration, preparation, and early career decisions
 
 Be encouraging, professional, practical, and specific. When recommending resources, give actual names of courses, platforms, or books when possible. Tailor advice to the user's existing skills and experience.
-  `;
+`;
 
+/**
+ * Career Assistant Chat
+ */
+export async function getCareerAdvice(message: string, userProfile: any) {
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: message,
-      config: { systemInstruction },
-    });
-    return response.text;
+    const prompt = `${SYSTEM_INSTRUCTION}\n\nUser Profile: ${JSON.stringify(userProfile)}\n\nUser Question: ${message}`;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
   } catch (error) {
     console.error("Gemini career advice error:", error);
     throw error;
@@ -40,8 +45,8 @@ Be encouraging, professional, practical, and specific. When recommending resourc
  * Resume Formatter - creates a tailored resume
  */
 export async function generateResume(userProfile: any, jobDescription: string) {
-  const prompt = `
-Create a professional, ATS-optimized resume tailored to this specific job posting.
+  try {
+    const prompt = `${SYSTEM_INSTRUCTION}\n\nCreate a professional, ATS-optimized resume tailored to this specific job posting.
 
 USER PROFILE:
 ${JSON.stringify(userProfile, null, 2)}
@@ -57,16 +62,39 @@ Instructions:
 - Organize sections: Contact Info, Professional Summary, Skills, Experience, Education, Projects (if relevant)
 - Keep it concise (aim for 1-2 pages worth of content)
 - Match keywords from the job description naturally
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: prompt,
-    });
-    return response.text;
+`;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
   } catch (error) {
     console.error("Gemini resume generation error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Transcript Skill Extraction - parses transcript text and extracts skills
+ */
+export async function extractSkillsFromTranscript(transcriptText: string) {
+  try {
+    const prompt = `${SYSTEM_INSTRUCTION}\n\nAnalyze this academic transcript and extract relevant professional skills.
+
+TRANSCRIPT TEXT:
+${transcriptText}
+
+Instructions:
+- Extract technical skills (programming languages, tools, software)
+- Extract soft skills (communication, leadership, problem-solving)
+- Extract domain knowledge (specific fields or industries)
+- List them in categories
+- Be specific and accurate
+- Format as a JSON object with categories as keys
+`;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("Gemini transcript analysis error:", error);
     throw error;
   }
 }
@@ -75,8 +103,8 @@ Instructions:
  * Cover Letter Generator
  */
 export async function generateCoverLetter(userProfile: any, jobDescription: string) {
-  const prompt = `
-Write a compelling, tailored cover letter for this specific job posting.
+  try {
+    const prompt = `${SYSTEM_INSTRUCTION}\n\nWrite a compelling, tailored cover letter for this specific job posting.
 
 USER PROFILE:
 ${JSON.stringify(userProfile, null, 2)}
@@ -93,55 +121,12 @@ Instructions:
 - Closing paragraph: Reiterate interest and include a call to action
 - Keep it professional but personable
 - Aim for 3-4 paragraphs total
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: prompt,
-    });
-    return response.text;
+`;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
   } catch (error) {
     console.error("Gemini cover letter generation error:", error);
-    throw error;
-  }
-}
-
-/**
- * Transcript Skill Extraction - parses transcript text and extracts skills
- */
-export async function extractSkillsFromTranscript(transcriptText: string) {
-  const prompt = `
-Analyze this academic transcript and extract relevant professional skills.
-
-TRANSCRIPT TEXT:
-${transcriptText}
-
-Instructions:
-- Identify courses and their descriptions
-- Map courses to industry-relevant skills
-- Return ONLY a JSON array of skill strings, nothing else
-- Include both technical skills (e.g., "Python", "Data Analysis") and soft skills (e.g., "Technical Writing", "Research Methods")
-- Be specific: prefer "React.js" over "Web Development", "Statistical Analysis" over "Math"
-- Deduplicate and limit to the top 20 most relevant skills
-
-Example output: ["Python", "Machine Learning", "Statistical Analysis", "Technical Writing"]
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: prompt,
-    });
-    const text = response.text || '[]';
-    // Extract JSON array from response
-    const match = text.match(/\[[\s\S]*?\]/);
-    if (match) {
-      return JSON.parse(match[0]) as string[];
-    }
-    return [];
-  } catch (error) {
-    console.error("Gemini transcript extraction error:", error);
     throw error;
   }
 }
