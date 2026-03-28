@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Briefcase, Bookmark, CheckCircle, Clock, Trash2,ExternalLink, X, FileText, FileCode, Download, Eye } from 'lucide-react';
+import { Briefcase, Bookmark, CheckCircle, Clock, Trash2, ExternalLink, X, FileText, FileCode, FileDown, Eye } from 'lucide-react';
 import Markdown from 'react-markdown';
-import { db, auth, collection, onSnapshot, deleteDoc, doc } from '../firebase';
-import { Job } from '../types';
+import { db, auth, collection, onSnapshot, deleteDoc, doc, getDoc } from '../firebase';
+import { Job, UserProfile } from '../types';
+import JobModal from '../components/JobModal';
+import { downloadUserContentAsPdf } from '../utils/documentDownload';
 
 export default function MyJobs() {
   const [savedJobs, setSavedJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [selectedJobDocuments, setSelectedJobDocuments] = useState<any[] | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<any>(null);
@@ -15,14 +19,21 @@ export default function MyJobs() {
   useEffect(() => {
     if (!auth.currentUser) return;
 
+    const unsubProfile = onSnapshot(doc(db, 'users', auth.currentUser.uid), (doc) => {
+      setUserProfile(doc.data() as UserProfile);
+    });
+
     const savedJobsRef = collection(db, 'users', auth.currentUser.uid, 'saved_jobs');
-    const unsubscribe = onSnapshot(savedJobsRef, (snapshot) => {
+    const unsubJobs = onSnapshot(savedJobsRef, (snapshot) => {
       const jobs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSavedJobs(jobs);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubProfile();
+      unsubJobs();
+    };
   }, []);
 
   const removeJob = async (id: string) => {
@@ -54,22 +65,29 @@ export default function MyJobs() {
     fetchJobDocuments(jobId);
   };
 
-  const downloadDocument = (content: string, filename: string) => {
-    const element = document.createElement('a');
-    const file = new Blob([content], { type: 'text/markdown' });
-    element.href = URL.createObjectURL(file);
-    element.download = filename;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
-
   return (
     <div className="space-y-8">
       <header>
         <h1 className="text-3xl font-bold text-stone-900 tracking-tight">My Jobs</h1>
         <p className="text-stone-500">Track the jobs you've saved and applied to.</p>
       </header>
+
+      {/* Job Modal */}
+      {selectedJob && (
+        <JobModal
+          job={selectedJob}
+          userProfile={userProfile}
+          onClose={() => setSelectedJob(null)}
+          isSaved={savedJobs.some(j => j.id === selectedJob.id)}
+          onSaveToggle={() => {
+            const jobToToggle = savedJobs.find(j => j.id === selectedJob.id);
+            if (jobToToggle) {
+              removeJob(jobToToggle.id);
+            }
+            setSelectedJob(null);
+          }}
+        />
+      )}
 
       {/* Preview Modal */}
       <AnimatePresence>
@@ -92,11 +110,18 @@ export default function MyJobs() {
               </div>
               <div className="p-6 border-t border-stone-100 bg-stone-50 flex items-center justify-between gap-3">
                 <button
-                  onClick={() => downloadDocument(previewDoc.content, `${previewDoc.type}-${previewDoc.jobTitle?.replace(/\s+/g, '-')}.md`)}
-                  className="flex items-center space-x-2 text-emerald-600 font-bold hover:text-emerald-700 transition-colors"
+                  type="button"
+                  onClick={() =>
+                    downloadUserContentAsPdf(
+                      previewDoc.content,
+                      previewDoc.type,
+                      `${previewDoc.type}-${previewDoc.jobTitle?.replace(/\s+/g, '-') ?? 'document'}`
+                    )
+                  }
+                  className="flex items-center space-x-2 text-emerald-700 font-bold hover:text-emerald-800 transition-colors"
                 >
-                  <Download size={18} />
-                  <span>Download</span>
+                  <FileDown size={18} />
+                  <span>Download PDF</span>
                 </button>
                 <button
                   onClick={() => setPreviewDoc(null)}
@@ -150,11 +175,18 @@ export default function MyJobs() {
                           <Eye size={18} />
                         </button>
                         <button
-                          onClick={() => downloadDocument(doc.content, `${doc.type}-${doc.jobTitle?.replace(/\s+/g, '-')}.md`)}
+                          type="button"
+                          onClick={() =>
+                            downloadUserContentAsPdf(
+                              doc.content,
+                              doc.type,
+                              `${doc.type}-${doc.jobTitle?.replace(/\s+/g, '-') ?? 'document'}`
+                            )
+                          }
                           className="p-2 text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          title="Download"
+                          title="Download PDF"
                         >
-                          <Download size={18} />
+                          <FileDown size={18} />
                         </button>
                       </div>
                     </div>
@@ -190,7 +222,8 @@ export default function MyJobs() {
               key={item.id}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden"
+              className="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden cursor-pointer"
+              onClick={() => setSelectedJob(item.jobData)}
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
@@ -203,7 +236,7 @@ export default function MyJobs() {
                     {item.status}
                   </span>
                   <button
-                    onClick={() => removeJob(item.id)}
+                    onClick={(e) => { e.stopPropagation(); removeJob(item.id); }}
                     className="p-2 text-stone-300 hover:text-red-600 transition-colors"
                   >
                     <Trash2 size={18} />
@@ -227,13 +260,16 @@ export default function MyJobs() {
 
               <div className="flex items-center justify-between pt-4 border-t border-stone-50">
                 <button
-                  onClick={() => handleViewFiles(item.jobData.id)}
+                  onClick={(e) => { e.stopPropagation(); handleViewFiles(item.jobData.id); }}
                   className="text-sm font-semibold text-emerald-600 hover:underline flex items-center transition-colors"
                 >
                   View Files
                   <ExternalLink size={14} className="ml-1" />
                 </button>
-                <button className="bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800 transition-colors">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); alert('Feature not implemented yet.'); }}
+                  className="bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800 transition-colors"
+                >
                   Update Status
                 </button>
               </div>

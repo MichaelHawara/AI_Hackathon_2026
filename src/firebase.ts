@@ -1,25 +1,30 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocFromServer } from 'firebase/firestore';
 
-// Firebase configuration - temporarily hardcoded for testing
-const firebaseConfig = {
-  apiKey: "AIzaSyAW9Jx6Ur1ltrLTFMyVSYW5LFT6pfolFiw",
-  authDomain: "ai-hackathon-2026-70c99.firebaseapp.com",
-  projectId: "ai-hackathon-2026-70c99",
-  storageBucket: "ai-hackathon-2026-70c99.firebasestorage.app",
-  messagingSenderId: "857931005645",
-  appId: "1:857931005645:web:2c843569a33fb1a7f1b384",
-  firestoreDatabaseId: "(default)"
-};
+function readFirebaseConfig(): FirebaseOptions {
+  const {
+    VITE_FIREBASE_API_KEY: apiKey,
+    VITE_FIREBASE_AUTH_DOMAIN: authDomain,
+    VITE_FIREBASE_PROJECT_ID: projectId,
+    VITE_FIREBASE_STORAGE_BUCKET: storageBucket,
+    VITE_FIREBASE_MESSAGING_SENDER_ID: messagingSenderId,
+    VITE_FIREBASE_APP_ID: appId
+  } = import.meta.env;
 
-console.log('✅ Firebase config loaded (hardcoded for testing)');
+  if (!apiKey || !authDomain || !projectId || !storageBucket || !messagingSenderId || !appId) {
+    throw new Error(
+      'Firebase is not configured. Copy `.env.example` to `.env.local` and set all VITE_FIREBASE_* variables (Firebase Console → Project settings).'
+    );
+  }
 
-// Initialize Firebase SDK
-const app = initializeApp(firebaseConfig);
+  return { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId };
+}
 
-// Initialize Firestore with the specific database ID if provided
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const app = initializeApp(readFirebaseConfig());
+
+// Default Firestore database — use single-arg initializer (see Firebase JS modular SDK)
+export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -76,7 +81,8 @@ export {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   doc, 
-  getDoc, 
+  getDoc,
+  getDocs,
   setDoc, 
   updateDoc, 
   deleteDoc, 

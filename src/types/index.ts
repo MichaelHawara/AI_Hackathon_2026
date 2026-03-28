@@ -2,6 +2,8 @@ export interface UserProfile {
   uid: string;
   fullName: string;
   email: string;
+  /** Normalized public profile URL, e.g. https://www.linkedin.com/in/your-handle */
+  linkedInProfileUrl?: string;
   phone?: string;
   address?: string;
   photoURL?: string;
@@ -13,6 +15,7 @@ export interface UserProfile {
   volunteerExperience?: VolunteerExperience[];
   skills?: string[];
   preferences?: JobPreferences;
+  certifications?: Certification[];
 }
 
 export interface Experience {
@@ -60,6 +63,16 @@ export interface VolunteerExperience {
   description: string;
 }
 
+export interface Certification {
+  id?: string;
+  name: string;
+  issuingOrganization: string;
+  issueDate: string;
+  expirationDate?: string;
+  credentialId?: string;
+  credentialUrl?: string;
+}
+
 export interface JobPreferences {
   roles: string[];
   workType: 'In-person' | 'Remote' | 'Hybrid';
@@ -78,6 +91,7 @@ export interface Job {
   postedDate: string;
   workType?: 'In-person' | 'Remote' | 'Hybrid';
   requirements?: string[];
+  url?: string;
 }
 
 export interface UserJob {
@@ -97,4 +111,5 @@ export interface UserDocument {
   createdAt: string;
   jobId?: string;
   jobTitle?: string;
+  jobCompany?: string;
 }

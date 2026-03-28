@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, X, Minimize2, Maximize2, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getCareerAdvice } from '../services/gemini';
+import { getCareerAdvice, formatGeminiError } from '../services/gemini';
 import { db, auth, doc, getDoc } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,16 +17,16 @@ export default function Chatbot() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (auth.currentUser) {
-        const docRef = doc(db, 'users', auth.currentUser.uid);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const docRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setUserProfile(docSnap.data());
         }
       }
-    };
-    fetchProfile();
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -44,7 +45,16 @@ export default function Chatbot() {
       const advice = await getCareerAdvice(userMsg, userProfile);
       setMessages(prev => [...prev, { role: 'bot', text: advice || "Sorry, I couldn't process that." }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'bot', text: "Error connecting to AI. Please try again later." }]);
+      console.error('Gemini API Error:', error);
+      const detail = formatGeminiError(error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'bot',
+          text:
+            `Sorry, the AI request failed.\n\n${detail}\n\nIf you just added VITE_GEMINI_API_KEY to .env.local, restart the dev server. Set VITE_GEMINI_MODEL to a current model id from https://ai.google.dev/gemini-api/docs/models/gemini (e.g. gemini-2.5-flash-lite).`
+        }
+      ]);
     } finally {
       setLoading(false);
     }
@@ -55,13 +65,15 @@ export default function Chatbot() {
       <AnimatePresence>
         {!isOpen && (
           <motion.button
+            type="button"
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={() => setIsOpen(true)}
             className="w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-emerald-700 transition-colors"
+            aria-label="Open career assistant chat"
           >
-            <MessageSquare size={24} />
+            <MessageSquare size={24} aria-hidden />
           </motion.button>
         )}
 
@@ -125,20 +137,26 @@ export default function Chatbot() {
                 {/* Input */}
                 <div className="p-4 border-t border-stone-200 bg-white">
                   <div className="flex items-center space-x-2">
+                    <label htmlFor="chatbot-message-input" className="sr-only">
+                      Message to career assistant
+                    </label>
                     <input
+                      id="chatbot-message-input"
                       type="text"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                       placeholder="Ask about jobs, skills..."
                       className="flex-1 bg-stone-100 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
                     />
                     <button
+                      type="button"
                       onClick={handleSend}
                       disabled={loading}
                       className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 disabled:opacity-50"
+                      aria-label="Send message"
                     >
-                      <Send size={18} />
+                      <Send size={18} aria-hidden />
                     </button>
                   </div>
                 </div>

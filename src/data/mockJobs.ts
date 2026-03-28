@@ -11,7 +11,8 @@ export const mockJobs: Job[] = [
     pay: '$45/hr',
     postedDate: new Date(Date.now() - 1 * 86400000).toISOString(),
     workType: 'Hybrid',
-    requirements: ['Java', 'Python', 'C++', 'Distributed Systems', 'Data Structures']
+    requirements: ['Java', 'Python', 'C++', 'Distributed Systems', 'Data Structures'],
+    url: 'https://careers.google.com/jobs/results/131551235335996102-software-engineering-intern-bs-summer-2023/'
   },
   {
     id: '2',
@@ -23,7 +24,8 @@ export const mockJobs: Job[] = [
     pay: '$120k/yr',
     postedDate: new Date(Date.now() - 2 * 86400000).toISOString(),
     workType: 'Hybrid',
-    requirements: ['Product Strategy', 'A/B Testing', 'Analytics', 'Cross-functional Leadership']
+    requirements: ['Product Strategy', 'A/B Testing', 'Analytics', 'Cross-functional Leadership'],
+    url: 'https://www.metacareers.com/v2/jobs/1032938914652594/'
   },
   {
     id: '3',
@@ -35,7 +37,8 @@ export const mockJobs: Job[] = [
     pay: '$55/hr',
     postedDate: new Date(Date.now() - 1 * 86400000).toISOString(),
     workType: 'In-person',
-    requirements: ['Python', 'R', 'SQL', 'Machine Learning', 'Deep Learning', 'TensorFlow']
+    requirements: ['Python', 'R', 'SQL', 'Machine Learning', 'Deep Learning', 'TensorFlow'],
+    url: 'https://www.indeed.com/viewjob?jk=7a2b2728b9b0a7c9'
   },
   {
     id: '4',
@@ -47,7 +50,8 @@ export const mockJobs: Job[] = [
     pay: '$40/hr',
     postedDate: new Date(Date.now() - 3 * 86400000).toISOString(),
     workType: 'Hybrid',
-    requirements: ['User Research', 'Usability Testing', 'Figma', 'Survey Design']
+    requirements: ['User Research', 'Usability Testing', 'Figma', 'Survey Design'],
+    url: 'https://careers.airbnb.com/positions/45345-ux-research-intern/'
   },
   {
     id: '5',
@@ -59,7 +63,8 @@ export const mockJobs: Job[] = [
     pay: '$150k/yr',
     postedDate: new Date(Date.now() - 2 * 86400000).toISOString(),
     workType: 'Remote',
-    requirements: ['Ruby', 'Go', 'Java', 'APIs', 'PostgreSQL', 'Distributed Systems']
+    requirements: ['Ruby', 'Go', 'Java', 'APIs', 'PostgreSQL', 'Distributed Systems'],
+    url: 'https://stripe.com/jobs/listing/backend-engineer/45343'
   },
   {
     id: '6',
@@ -71,7 +76,8 @@ export const mockJobs: Job[] = [
     pay: '$65/hr',
     postedDate: new Date(Date.now() - 1 * 86400000).toISOString(),
     workType: 'In-person',
-    requirements: ['PyTorch', 'Python', 'Transformers', 'Linear Algebra', 'NLP']
+    requirements: ['PyTorch', 'Python', 'Transformers', 'Linear Algebra', 'NLP'],
+    url: 'https://openai.com/careers/machine-learning-engineer-intern/'
   },
   {
     id: '7',
@@ -83,7 +89,8 @@ export const mockJobs: Job[] = [
     pay: '$28/hr',
     postedDate: new Date(Date.now() - 4 * 86400000).toISOString(),
     workType: 'Remote',
-    requirements: ['SQL', 'Excel', 'Tableau', 'Google Analytics', 'Marketing Strategy']
+    requirements: ['SQL', 'Excel', 'Tableau', 'Google Analytics', 'Marketing Strategy'],
+    url: 'https://www.hubspot.com/careers/jobs/45343'
   },
   {
     id: '8',
@@ -95,7 +102,8 @@ export const mockJobs: Job[] = [
     pay: '$140k/yr',
     postedDate: new Date(Date.now() - 2 * 86400000).toISOString(),
     workType: 'Hybrid',
-    requirements: ['React', 'TypeScript', 'CSS', 'WebGL', 'Performance Optimization']
+    requirements: ['React', 'TypeScript', 'CSS', 'WebGL', 'Performance Optimization'],
+    url: 'https://www.indeed.com/viewjob?jk=6789'
   },
   {
     id: '9',
@@ -107,7 +115,8 @@ export const mockJobs: Job[] = [
     pay: '$55k/yr + commission',
     postedDate: new Date(Date.now() - 5 * 86400000).toISOString(),
     workType: 'In-person',
-    requirements: ['Sales', 'CRM', 'Communication', 'Lead Generation', 'Cold Outreach']
+    requirements: ['Sales', 'CRM', 'Communication', 'Lead Generation', 'Cold Outreach'],
+    url: 'https://www.indeed.com/viewjob?jk=101112'
   },
   {
     id: '10',
@@ -119,7 +128,8 @@ export const mockJobs: Job[] = [
     pay: '$35/hr',
     postedDate: new Date(Date.now() - 3 * 86400000).toISOString(),
     workType: 'Hybrid',
-    requirements: ['Network Security', 'SIEM', 'Python', 'Linux', 'Incident Response']
+    requirements: ['Network Security', 'SIEM', 'Python', 'Linux', 'Incident Response'],
+    url: 'https://www.crowdstrike.com/careers/jobs/45343'
   },
   {
     id: '11',
@@ -131,7 +141,8 @@ export const mockJobs: Job[] = [
     pay: '$50/hr',
     postedDate: new Date(Date.now() - 1 * 86400000).toISOString(),
     workType: 'In-person',
-    requirements: ['Swift', 'SwiftUI', 'UIKit', 'Xcode', 'iOS Development']
+    requirements: ['Swift', 'SwiftUI', 'UIKit', 'Xcode', 'iOS Development'],
+    url: 'https://www.apple.com/careers/us/45343.html'
   },
   {
     id: '12',
@@ -143,7 +154,8 @@ export const mockJobs: Job[] = [
     pay: '$85k/yr',
     postedDate: new Date(Date.now() - 6 * 86400000).toISOString(),
     workType: 'In-person',
-    requirements: ['Financial Modeling', 'Excel', 'PowerPoint', 'Valuation', 'Accounting']
+    requirements: ['Financial Modeling', 'Excel', 'PowerPoint', 'Valuation', 'Accounting'],
+    url: 'https://www.goldmansachs.com/careers/students/programs/americas/summer-analyst-program.html'
   },
   {
     id: '13',
@@ -155,7 +167,8 @@ export const mockJobs: Job[] = [
     pay: '$48/hr',
     postedDate: new Date(Date.now() - 2 * 86400000).toISOString(),
     workType: 'Hybrid',
-    requirements: ['AWS', 'Linux', 'Python', 'Docker', 'Terraform', 'CI/CD']
+    requirements: ['AWS', 'Linux', 'Python', 'Docker', 'Terraform', 'CI/CD'],
+    url: 'https://www.amazon.jobs/en/jobs/45343/cloud-engineering-intern'
   },
   {
     id: '14',
@@ -167,7 +180,8 @@ export const mockJobs: Job[] = [
     pay: '$30/hr',
     postedDate: new Date(Date.now() - 4 * 86400000).toISOString(),
     workType: 'Remote',
-    requirements: ['Adobe Creative Suite', 'Figma', 'Typography', 'Brand Design', 'Illustration']
+    requirements: ['Adobe Creative Suite', 'Figma', 'Typography', 'Brand Design', 'Illustration'],
+    url: 'https://www.canva.com/careers/jobs/45343'
   },
   {
     id: '15',
@@ -179,7 +193,8 @@ export const mockJobs: Job[] = [
     pay: '$160k/yr',
     postedDate: new Date(Date.now() - 3 * 86400000).toISOString(),
     workType: 'Remote',
-    requirements: ['Kubernetes', 'Docker', 'AWS', 'Python', 'Go', 'CI/CD', 'Microservices']
+    requirements: ['Kubernetes', 'Docker', 'AWS', 'Python', 'Go', 'CI/CD', 'Microservices'],
+    url: 'https://jobs.netflix.com/jobs/45343'
   },
   {
     id: '16',
@@ -191,7 +206,8 @@ export const mockJobs: Job[] = [
     pay: '$22/hr',
     postedDate: new Date(Date.now() - 7 * 86400000).toISOString(),
     workType: 'In-person',
-    requirements: ['HR Management', 'Recruiting', 'Communication', 'Organization', 'Microsoft Office']
+    requirements: ['HR Management', 'Recruiting', 'Communication', 'Organization', 'Microsoft Office'],
+    url: 'https://www2.deloitte.com/us/en/careers/students.html'
   },
   {
     id: '17',
@@ -203,7 +219,8 @@ export const mockJobs: Job[] = [
     pay: '$32/hr',
     postedDate: new Date(Date.now() - 5 * 86400000).toISOString(),
     workType: 'In-person',
-    requirements: ['MATLAB', 'CAD', 'FDA Regulations', 'Medical Devices', 'Testing']
+    requirements: ['MATLAB', 'CAD', 'FDA Regulations', 'Medical Devices', 'Testing'],
+    url: 'https://www.medtronic.com/us-en/about/careers.html'
   },
   {
     id: '18',
@@ -215,7 +232,8 @@ export const mockJobs: Job[] = [
     pay: '$75k/yr',
     postedDate: new Date(Date.now() - 4 * 86400000).toISOString(),
     workType: 'In-person',
-    requirements: ['Supply Chain', 'Data Analysis', 'Excel', 'SAP', 'Forecasting']
+    requirements: ['Supply Chain', 'Data Analysis', 'Excel', 'SAP', 'Forecasting'],
+    url: 'https://www.tesla.com/careers/search'
   },
   {
     id: '19',
@@ -227,7 +245,8 @@ export const mockJobs: Job[] = [
     pay: '$25/hr',
     postedDate: new Date(Date.now() - 6 * 86400000).toISOString(),
     workType: 'Remote',
-    requirements: ['Writing', 'SEO', 'Content Strategy', 'CMS', 'Research']
+    requirements: ['Writing', 'SEO', 'Content Strategy', 'CMS', 'Research'],
+    url: 'https://www.notion.so/careers'
   },
   {
     id: '20',
@@ -239,6 +258,7 @@ export const mockJobs: Job[] = [
     pay: '$130k/yr',
     postedDate: new Date(Date.now() - 2 * 86400000).toISOString(),
     workType: 'Remote',
-    requirements: ['React', 'Node.js', 'Ruby on Rails', 'PostgreSQL', 'REST APIs', 'TypeScript']
+    requirements: ['React', 'Node.js', 'Ruby on Rails', 'PostgreSQL', 'REST APIs', 'TypeScript'],
+    url: 'https://www.shopify.com/careers/search'
   }
 ];

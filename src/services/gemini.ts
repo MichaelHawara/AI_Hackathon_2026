@@ -1,16 +1,21 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import type { GenerativeModel } from '@google/generative-ai';
+import type { Job } from '../types';
+import { stripAiPreamble } from '../utils/aiOutput';
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+function buildJobContextBlock(job: Job): string {
+  return `TARGET JOB (tailor all content to this role — use exact job title and company where appropriate):
+- Title: ${job.title}
+- Company: ${job.company}
+- Location: ${job.location}
+- Work arrangement: ${job.workType ?? 'See description'}
+- Compensation (if listed): ${job.pay ?? 'Not listed'}
+- Listed requirements / keywords: ${(job.requirements ?? []).join(', ') || 'Infer from description'}
 
-if (!apiKey) {
-  throw new Error(
-    "VITE_GEMINI_API_KEY is not configured. Please add it to your .env.local file. " +
-    "Get your API key from: https://aistudio.google.com/app/apikey"
-  );
+Full job description:
+${job.description}
+`;
 }
-
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
 
 const SYSTEM_INSTRUCTION = `
 You are CareerPath AI, an expert Career Assistant built specifically for students navigating the workforce.
@@ -27,106 +32,192 @@ Be encouraging, professional, practical, and specific. When recommending resourc
 `;
 
 /**
- * Career Assistant Chat
+ * Stable model IDs per https://ai.google.dev/gemini-api/docs/models/gemini — older aliases like
+ * `gemini-1.5-flash` often return 404 on v1beta.
  */
-export async function getCareerAdvice(message: string, userProfile: any) {
-  try {
-    const prompt = `${SYSTEM_INSTRUCTION}\n\nUser Profile: ${JSON.stringify(userProfile)}\n\nUser Question: ${message}`;
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
-  } catch (error) {
-    console.error("Gemini career advice error:", error);
-    throw error;
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
+
+/**
+ * Tried in order after the preferred model when a call fails with quota/rate-limit OR 404/unsupported.
+ */
+const MODEL_FALLBACK_CHAIN = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-flash-latest'
+];
+
+function getPreferredModelName(): string {
+  return import.meta.env.VITE_GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
+}
+
+function getApiKey(): string {
+  const key = import.meta.env.VITE_GEMINI_API_KEY?.trim();
+  if (!key) {
+    throw new Error(
+      'MISSING_GEMINI_KEY: Add VITE_GEMINI_API_KEY to .env.local in the project root, then restart the dev server (npm run dev). Get a key at https://aistudio.google.com/app/apikey'
+    );
   }
+  return key;
+}
+
+/** Retry with the next model ID when quota is hit or the model ID is wrong/retired (404). */
+function shouldTryNextModel(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/429|\[429\]|quota exceeded|rate limit|resource_exhausted|RESOURCE_EXHAUSTED/i.test(msg)) {
+    return true;
+  }
+  if (/\[404\]|404|not found|not supported for generateContent|is not found for API version/i.test(msg)) {
+    return true;
+  }
+  return false;
+}
+
+function isQuotaOrRateLimit(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /429|\[429\]|quota exceeded|rate limit|resource_exhausted|RESOURCE_EXHAUSTED/i.test(msg);
 }
 
 /**
- * Resume Formatter - creates a tailored resume
+ * Try preferred model, then fallbacks on quota/rate-limit or 404/unsupported model name.
  */
-export async function generateResume(userProfile: any, jobDescription: string) {
-  try {
-    const prompt = `${SYSTEM_INSTRUCTION}\n\nCreate a professional, ATS-optimized resume tailored to this specific job posting.
+async function withModelFallback<T>(run: (model: GenerativeModel) => Promise<T>): Promise<T> {
+  const preferred = getPreferredModelName();
+  const tryNames = [preferred, ...MODEL_FALLBACK_CHAIN.filter((m) => m !== preferred)];
+  const genAI = new GoogleGenerativeAI(getApiKey());
 
-USER PROFILE:
+  for (let i = 0; i < tryNames.length; i++) {
+    const name = tryNames[i];
+    try {
+      const model = genAI.getGenerativeModel({ model: name });
+      return await run(model);
+    } catch (e) {
+      if (!shouldTryNextModel(e)) throw e;
+      if (i === tryNames.length - 1) throw e;
+      console.warn(`[Gemini] Model "${name}" unavailable or over quota; trying next model…`);
+    }
+  }
+  throw new Error('Gemini: no model candidates');
+}
+
+async function withJsonModelFallback<T>(run: (model: GenerativeModel) => Promise<T>): Promise<T> {
+  const preferred = getPreferredModelName();
+  const tryNames = [preferred, ...MODEL_FALLBACK_CHAIN.filter((m) => m !== preferred)];
+  const genAI = new GoogleGenerativeAI(getApiKey());
+
+  for (let i = 0; i < tryNames.length; i++) {
+    const name = tryNames[i];
+    try {
+      const model = genAI.getGenerativeModel({
+        model: name,
+        generationConfig: { responseMimeType: 'application/json' }
+      });
+      return await run(model);
+    } catch (e) {
+      if (!shouldTryNextModel(e)) throw e;
+      if (i === tryNames.length - 1) throw e;
+      console.warn(`[Gemini] Model "${name}" unavailable or over quota; trying next model…`);
+    }
+  }
+  throw new Error('Gemini JSON: all models exhausted');
+}
+
+export function formatGeminiError(err: unknown): string {
+  if (err instanceof Error) {
+    if (err.message.startsWith('MISSING_GEMINI_KEY')) {
+      return err.message.replace(/^MISSING_GEMINI_KEY:\s*/, '');
+    }
+    let msg = err.message;
+    if (msg.length > 1200) {
+      msg = msg.slice(0, 1200) + '… [truncated]';
+    }
+    if (isQuotaOrRateLimit(err)) {
+      msg +=
+        '\n\nTip: Free-tier limits are per-model. Set VITE_GEMINI_MODEL (e.g. gemini-2.5-flash-lite), wait, or check quotas: https://ai.google.dev/gemini-api/docs/rate-limits';
+    } else if (/\[404\]|404|not found|not supported for generateContent/i.test(msg)) {
+      msg +=
+        '\n\nTip: That model id may be retired. Set VITE_GEMINI_MODEL to a current id from https://ai.google.dev/gemini-api/docs/models/gemini (e.g. gemini-2.5-flash-lite).';
+    }
+    return msg;
+  }
+  return String(err);
+}
+
+export async function getCareerAdvice(message: string, userProfile: unknown) {
+  const prompt = `${SYSTEM_INSTRUCTION}\n\nUser Profile: ${JSON.stringify(userProfile)}\n\nUser Question: ${message}`;
+  return withModelFallback(async (model) => {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
+  });
+}
+
+export async function generateResume(userProfile: unknown, job: Job) {
+  const prompt = `You output ONLY the resume in Markdown. No preamble, no "Here is", no meta commentary before the document.
+
+${SYSTEM_INSTRUCTION}
+
+${buildJobContextBlock(job)}
+
+APPLICANT PROFILE (use truthfully; do not invent employers, degrees, or dates):
 ${JSON.stringify(userProfile, null, 2)}
 
-JOB DESCRIPTION:
-${jobDescription}
-
-Instructions:
-- Format the output in clean Markdown
-- Include a professional summary that highlights relevant qualifications
-- Emphasize skills and experiences that match the job requirements
-- Use strong action verbs and quantify achievements where possible
-- Organize sections: Contact Info, Professional Summary, Skills, Experience, Education, Projects (if relevant)
-- Keep it concise (aim for 1-2 pages worth of content)
-- Match keywords from the job description naturally
+Resume rules:
+- Start with a single top-level heading: "# " followed by the applicant's full name (from profile).
+- Then sections using ## headings in this order when data exists: Professional Summary, Skills, Experience, Education, Projects, Certifications, Additional (volunteering/research as needed).
+- Professional Summary: 2–3 tight sentences echoing themes and keywords from the TARGET JOB description.
+- Experience bullets: tie achievements to what the job asks for; use metrics when present in profile.
+- Skills: prioritize overlap with the job's requirements and description.
+- Do not include labels like "Resume" or "Generated by AI" or markdown code fences around the whole document.
+- Keep ATS-friendly plain structure (use ## and bullet lists with "- ").
 `;
+  return withModelFallback(async (model) => {
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
-  } catch (error) {
-    console.error("Gemini resume generation error:", error);
-    throw error;
-  }
+    return stripAiPreamble(response.text());
+  });
 }
 
-/**
- * Transcript Skill Extraction - parses transcript text and extracts skills
- */
-export async function extractSkillsFromTranscript(transcriptText: string) {
-  try {
-    const prompt = `${SYSTEM_INSTRUCTION}\n\nAnalyze this academic transcript and extract relevant professional skills.
+export async function extractSkillsFromTranscript(transcriptText: string): Promise<string[]> {
+  const prompt = `${SYSTEM_INSTRUCTION}\n\nAnalyze this academic transcript and extract relevant professional skills.
 
 TRANSCRIPT TEXT:
 ${transcriptText}
 
 Instructions:
-- Extract technical skills (programming languages, tools, software)
-- Extract soft skills (communication, leadership, problem-solving)
-- Extract domain knowledge (specific fields or industries)
-- List them in categories
-- Be specific and accurate
-- Format as a JSON object with categories as keys
+- Extract all professional skills (technical, soft, domain-specific).
+- Return a JSON object with a single key "skills" which is an array of strings.
+- Example: { "skills": ["JavaScript", "React", "Team Leadership"] }
 `;
+  return withJsonModelFallback(async (model) => {
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
-  } catch (error) {
-    console.error("Gemini transcript analysis error:", error);
-    throw error;
-  }
+    const json = JSON.parse(response.text()) as { skills?: string[] };
+    return json.skills || [];
+  });
 }
 
-/**
- * Cover Letter Generator
- */
-export async function generateCoverLetter(userProfile: any, jobDescription: string) {
-  try {
-    const prompt = `${SYSTEM_INSTRUCTION}\n\nWrite a compelling, tailored cover letter for this specific job posting.
+export async function generateCoverLetter(userProfile: unknown, job: Job) {
+  const prompt = `You output ONLY the cover letter in Markdown. No preamble, no "Sure!", no explanation before the letter.
 
-USER PROFILE:
+${SYSTEM_INSTRUCTION}
+
+${buildJobContextBlock(job)}
+
+APPLICANT PROFILE:
 ${JSON.stringify(userProfile, null, 2)}
 
-JOB DESCRIPTION:
-${jobDescription}
-
-Instructions:
-- Format the output in Markdown
-- Address it professionally (use "Dear Hiring Manager" if no specific name)
-- Opening paragraph: Express enthusiasm and state the position
-- Body paragraphs: Connect the user's specific experiences and skills to job requirements
-- Highlight 2-3 key achievements or experiences that make them a strong fit
-- Closing paragraph: Reiterate interest and include a call to action
-- Keep it professional but personable
-- Aim for 3-4 paragraphs total
+Cover letter rules:
+- Start with a proper salutation on its own line, e.g. "Dear Hiring Manager," (unless a real hiring manager name exists in profile — there usually is not).
+- Opening: name the exact job title and company from the target job, and why this role fits the candidate.
+- Body: at least two substantial paragraphs citing specific experiences and skills FROM THE PROFILE that map to requirements in the job description (quote themes, not generic filler).
+- Closing: restate enthusiasm, thank the reader, and include a professional sign-off with the applicant's name from the profile on the last line.
+- Minimum length: roughly 320–450 words so it fills about one printed page with normal spacing (this is a hard target).
+- Use Markdown paragraphs (blank line between paragraphs). Do not wrap the letter in \`\`\` fences.
+- Do not mention "AI" or that this was generated.
 `;
+  return withModelFallback(async (model) => {
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
-  } catch (error) {
-    console.error("Gemini cover letter generation error:", error);
-    throw error;
-  }
+    return stripAiPreamble(response.text());
+  });
 }
