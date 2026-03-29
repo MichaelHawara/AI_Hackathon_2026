@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search as SearchIcon, MapPin, DollarSign, Clock, ExternalLink, Bookmark, BookmarkCheck, Briefcase, Sparkles, TrendingUp } from 'lucide-react';
+import { MapPin, DollarSign, Clock, Bookmark, BookmarkCheck, Briefcase, Sparkles, TrendingUp } from 'lucide-react';
 import { db, auth, collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp, getDoc } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { Job, UserProfile } from '../types';
 import JobModal from '../components/JobModal';
+import { mockJobs } from '../data/mockJobs';
 
 export default function Home() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -13,65 +17,87 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (auth.currentUser) {
-        const docRef = doc(db, 'users', auth.currentUser.uid);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/jobs');
+        if (res.ok) {
+          const remote = (await res.json()) as Job[];
+          if (!cancelled && Array.isArray(remote) && remote.length > 0) {
+            setJobs(remote);
+          } else if (!cancelled) {
+            setJobs(mockJobs);
+          }
+        } else if (!cancelled) {
+          setJobs(mockJobs);
+        }
+      } catch {
+        if (!cancelled) setJobs(mockJobs);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    let unsubscribeJobs: () => void;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const docRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setUserProfile({ uid: auth.currentUser.uid, ...docSnap.data() } as UserProfile);
+          setUserProfile({ uid: user.uid, ...docSnap.data() } as UserProfile);
         }
+        
+        const savedJobsRef = collection(db, 'users', user.uid, 'saved_jobs');
+        unsubscribeJobs = onSnapshot(savedJobsRef, (snapshot) => {
+          const ids = new Set(snapshot.docs.map(doc => doc.id));
+          setSavedJobIds(ids);
+        });
       }
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribeAuth();
+      if (unsubscribeJobs) unsubscribeJobs();
     };
-    fetchProfile();
-
-    // Mock jobs for now
-    const mockJobs: Job[] = [
-      {
-        id: '1',
-        title: 'Software Engineering Intern',
-        company: 'Google',
-        location: 'Mountain View, CA',
-        description: 'Work on large-scale distributed systems and innovative products.',
-        source: 'Handshake',
-        pay: '$45/hr',
-        postedDate: new Date().toISOString()
-      },
-      {
-        id: '2',
-        title: 'Product Management Associate',
-        company: 'Meta',
-        location: 'Remote',
-        description: 'Shape the future of social connection through innovative product development.',
-        source: 'LinkedIn',
-        pay: '$120k/yr',
-        postedDate: new Date().toISOString()
-      },
-      {
-        id: '3',
-        title: 'Data Science Fellow',
-        company: 'NVIDIA',
-        location: 'Santa Clara, CA',
-        description: 'Apply machine learning techniques to solve complex hardware and software problems.',
-        source: 'Indeed',
-        pay: '$55/hr',
-        postedDate: new Date().toISOString()
-      }
-    ];
-    setJobs(mockJobs);
-    setLoading(false);
-
-    if (auth.currentUser) {
-      const savedJobsRef = collection(db, 'users', auth.currentUser.uid, 'saved_jobs');
-      const unsubscribe = onSnapshot(savedJobsRef, (snapshot) => {
-        const ids = new Set(snapshot.docs.map(doc => doc.id));
-        setSavedJobIds(ids);
-      });
-      return () => unsubscribe();
-    }
   }, []);
 
-  const toggleSave = async (e: React.MouseEvent, job: Job) => {
-    e.stopPropagation();
+  useEffect(() => {
+    const jid = searchParams.get('jobId');
+    if (!jid || jobs.length === 0) return;
+    const j = jobs.find((x) => x.id === jid);
+    if (j) setSelectedJob(j);
+  }, [searchParams, jobs]);
+
+  const openJob = (job: Job) => {
+    setSelectedJob(job);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('jobId', job.id);
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  const closeJobModal = () => {
+    setSelectedJob(null);
+    if (searchParams.get('jobId')) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('jobId');
+          return next;
+        },
+        { replace: true }
+      );
+    }
+  };
+
+  const toggleSave = async (job: Job, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!auth.currentUser) return;
     const docRef = doc(db, 'users', auth.currentUser.uid, 'saved_jobs', job.id);
     
@@ -88,7 +114,7 @@ export default function Home() {
   };
 
   return (
-    <div className="space-y-12 pb-20">
+    <div className="space-y-8 pb-20">
       <header className="relative py-12 px-8 bg-gradient-to-br from-stone-900 to-stone-800 rounded-[2.5rem] overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-32 -mt-32" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl -ml-24 -mb-24" />
@@ -142,7 +168,7 @@ export default function Home() {
               <motion.div
                 key={job.id}
                 whileHover={{ y: -8, scale: 1.02 }}
-                onClick={() => setSelectedJob(job)}
+                onClick={() => openJob(job)}
                 className="bg-white p-8 rounded-[2.5rem] border border-stone-100 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.05)] hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] transition-all cursor-pointer group relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 group-hover:bg-emerald-100 transition-colors" />
@@ -153,7 +179,7 @@ export default function Home() {
                       <Briefcase size={28} />
                     </div>
                     <button
-                      onClick={(e) => toggleSave(e, job)}
+                      onClick={(e) => void toggleSave(job, e)}
                       className={`p-3 rounded-2xl transition-all ${
                         savedJobIds.has(job.id)
                           ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100'
@@ -199,8 +225,14 @@ export default function Home() {
                         +8
                       </div>
                     </div>
-                    <button className="bg-stone-900 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-stone-800 transition-all shadow-lg shadow-stone-100">
-                      Apply
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openJob(job);
+                      }}
+                      className="bg-stone-900 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-stone-800 transition-all shadow-lg shadow-stone-100"
+                    >
+                      View More
                     </button>
                   </div>
                 </div>
@@ -212,8 +244,10 @@ export default function Home() {
 
       <JobModal 
         job={selectedJob} 
-        onClose={() => setSelectedJob(null)} 
+        onClose={closeJobModal} 
         userProfile={userProfile}
+        isSaved={selectedJob ? savedJobIds.has(selectedJob.id) : false}
+        onSaveToggle={(job) => void toggleSave(job)}
       />
     </div>
   );

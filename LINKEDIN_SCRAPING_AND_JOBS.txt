@@ -1,0 +1,157 @@
+LINKEDIN IMPORT (RELEVANCE AI) AND REMOTE JOBS — STEP-BY-STEP
+===============================================================
+
+This file describes how the app pulls LinkedIn profile data and aggregates job
+listings. It maps each step to the code that implements it.
+
+
+PART A — ENVIRONMENT
+--------------------
+Step 1. Copy `.env.example` to `.env.local` (gitignored).
+
+Step 2. Optional: set `RELEVANCEAI_API_KEY` (server only; no `VITE_` prefix).
+If set, it is sent as the `Authorization` header on the webhook POST. If unset,
+the request is still sent (some public triggers work without a key).
+
+Step 3. Optional: set `RELEVANCEAI_WEBHOOK_URL` to override the default. The
+shareable form URL (`app.relevanceai.com/form/...`) is **not** the API endpoint;
+copy the exact `trigger_webhook` URL from Relevance → your tool → Triggers
+(it includes studio id `4b51cdf1-f328-477e-a4c4-b3760406073a` for this project).
+
+Functions: none (configuration only).
+
+
+PART B — LINKEDIN PROFILE IMPORT (CLIENT → SERVER)
+--------------------------------------------------
+Step 1. The UI (e.g. Account / Onboarding) collects a LinkedIn profile URL and
+calls `importLinkedInProfile` in `src/services/linkedin.ts`.
+
+Step 2. That function POSTs JSON `{ profileUrl }` to `POST /api/linkedin-import`
+(same origin in dev when Express + Vite run together).
+
+Step 3. `server.ts` validates the body, then calls `normalizeLinkedInUrl` from
+`linkedinScrape.ts` so only well-formed public-style `/in/...` URLs proceed.
+
+Step 4. The server calls `importLinkedInViaRelevance` in `relevanceLinkedIn.ts`.
+
+Functions:
+- `src/services/linkedin.ts` — HTTP client for `/api/linkedin-import`
+- `normalizeLinkedInUrl` — `linkedinScrape.ts`
+- Route handler — `server.ts` (`POST /api/linkedin-import`)
+
+
+PART C — RELEVANCE AI WEBHOOK REQUEST
+-------------------------------------
+Step 1. `importLinkedInViaRelevance` POSTs to the webhook URL. If
+`RELEVANCEAI_API_KEY` is set, it adds `Authorization: <key>`; otherwise the
+header is omitted.
+
+Step 2. The JSON body matches the webhook contract: `{"url":"<linkedin profile
+url>","name":""}` (`name` is optional).
+
+Step 3. The raw response is parsed as JSON when possible; otherwise it is
+wrapped as `{ raw: string }`.
+
+Step 4. `getProfileRecord` unwraps common envelopes (`output`, `result`,
+`data`). `mapRelevanceOutputToProfile` maps tool output into `UserProfile`,
+including LinkedIn-style fields: `full_name`, `first_name`/`last_name`,
+`experiences[]` (title, company, date_range, skills per row), `educations[]`,
+`profile_image_url`, `linkedin_url`.
+
+Functions:
+- `importLinkedInViaRelevance`, `getProfileRecord`, `mapRelevanceOutputToProfile`
+  — `relevanceLinkedIn.ts`
+
+
+PART D — PRIVATE PROFILE DETECTION
+----------------------------------
+Step 1. After a successful HTTP response from Relevance, `detectPrivateProfile`
+scans the full response text and recursively collected string fields from the
+JSON for phrases like "private profile", "authwall", "sign in to LinkedIn",
+etc.
+
+Step 2. If a private/restricted pattern matches, the server responds with
+HTTP 403 and `{ error, private: true }`. The client can show a clear message
+that the profile must be public.
+
+Step 3. If Relevance returns HTTP error status, the import returns an error
+string (mapped to client behavior in `linkedin.ts`).
+
+Functions:
+- `detectPrivateProfile` — `relevanceLinkedIn.ts`
+- `collectStrings` / `textFromPayload` — helpers in `relevanceLinkedIn.ts`
+
+
+PART E — MAPPING RELEVANCE OUTPUT TO APP PROFILE
+------------------------------------------------
+Step 1. `mapRelevanceOutputToProfile` accepts arbitrary JSON and looks for
+common shapes: `output`, `result`, or `data` wrappers, then fields such as
+`fullName`, `headline`, `experience` / `work_experience`, `skills`.
+
+Step 2. Experience entries are normalized to `Experience` objects with generated
+ids via `rid()`.
+
+Step 3. If structured experience is empty but a headline exists, a single
+synthetic experience row may be built from headline + about/summary text.
+
+Step 4. If no usable name, experience, or skills are found, the import fails
+with a parse error (caller may fall back — see Part F).
+
+Functions:
+- `mapRelevanceOutputToProfile` — `relevanceLinkedIn.ts`
+- `pickString`, `asRecord` — `relevanceLinkedIn.ts`
+
+
+PART F — FALLBACK SCRAPE (WHEN RELEVANCE DOES NOT SUCCEED)
+----------------------------------------------------------
+Step 1. If Relevance does not return a full success (e.g. missing API key,
+HTTP error, or empty parse), `server.ts` calls `scrapeLinkedInProfile` from
+`linkedinScrape.ts`.
+
+Step 2. Results are converted with `scrapeToUserProfile` into `Partial<UserProfile>`.
+
+Step 3. On scrape failure, the server may respond with 422 and URL-only
+fallback fields so the UI can still save the link.
+
+Functions:
+- `scrapeLinkedInProfile`, `normalizeLinkedInUrl` — `linkedinScrape.ts`
+- `scrapeToUserProfile` — inline in `server.ts`
+
+
+PART G — JOB LISTINGS (`GET /api/jobs`)
+---------------------------------------
+Step 1. The Home / Search pages call `fetch('/api/jobs')` and merge or replace
+mock data depending on response success.
+
+Step 2. `server.ts` handles `GET /api/jobs` by calling `aggregateRemoteJobs()`
+in `jobsAggregator.ts`.
+
+Step 3. `aggregateRemoteJobs` runs in parallel:
+  - `fetchIndeedJobs` — Indeed RSS for a fixed software-intern query (US).
+  - `fetchLinkedInRssJobs` — LinkedIn public jobs RSS for keywords + location.
+  - `fetchGoogleCareersJobs` — `https://careers.google.com/api/v3/search/` JSON.
+  - `handshakeSamples` — a small subset of Handshake-labeled entries from
+    `src/data/mockJobs.ts` (no stable public Handshake RSS in this integration).
+
+Step 4. Results are merged, deduplicated by `title|company`, and capped (e.g.
+18 items).
+
+Functions:
+- `aggregateRemoteJobs`, `fetchIndeedJobs`, `fetchLinkedInRssJobs`,
+  `fetchGoogleCareersJobs`, `handshakeSamples` — `jobsAggregator.ts`
+
+
+PART H — PDF DOCUMENTS (SEPARATE FROM LINKEDIN)
+-----------------------------------------------
+Step 1. Document upload uses a file input accepting PDF; the browser runs
+`extractPdfText` (`src/utils/extractPdfText.ts`) using pdf.js to extract text.
+
+Step 2. Extracted text (not the binary) is what gets stored with the document
+record.
+
+Functions:
+- `extractPdfText` — `src/utils/extractPdfText.ts`
+- UI — `src/pages/Documents.tsx`
+
+
+END OF FILE

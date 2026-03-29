@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Search, Briefcase, FileText, User, LogOut } from 'lucide-react';
 import { auth, signOut } from '../firebase';

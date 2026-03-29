@@ -1,16 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Search as SearchIcon, Filter, MapPin, Briefcase, ChevronRight, DollarSign, Clock, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search as SearchIcon, Filter,MapPin, Briefcase, ChevronRight, DollarSign, Clock, Sparkles, X } from 'lucide-react';
 import { Job, UserProfile } from '../types';
 import { db, auth, doc, getDoc } from '../firebase';
 import JobModal from '../components/JobModal';
+import { mockJobs } from '../data/mockJobs';
 
 export default function Search() {
   const [searchTerm, setSearchTerm] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    source: [] as string[],
+    workType: [] as string[],
+    minPay: 0,
+    maxPay: 200000,
+    location: ''
+  });
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -24,22 +32,47 @@ export default function Search() {
     };
     fetchProfile();
 
-    // Mock jobs
-    const mockJobs: Job[] = [
-      { id: '1', title: 'Software Engineering Intern', company: 'Google', location: 'Mountain View, CA', description: 'Work on large-scale distributed systems...', source: 'Handshake', pay: '$45/hr', postedDate: new Date().toISOString() },
-      { id: '2', title: 'Product Management Associate', company: 'Meta', location: 'Remote', description: 'Shape the future of social connection...', source: 'LinkedIn', pay: '$120k/yr', postedDate: new Date().toISOString() },
-      { id: '3', title: 'Data Science Fellow', company: 'NVIDIA', location: 'Santa Clara, CA', description: 'Apply machine learning techniques...', source: 'Indeed', pay: '$55/hr', postedDate: new Date().toISOString() },
-      { id: '4', title: 'UX Research Intern', company: 'Airbnb', location: 'San Francisco, CA', description: 'Help define the future of travel...', source: 'Handshake', pay: '$40/hr', postedDate: new Date().toISOString() },
-      { id: '5', title: 'Backend Developer', company: 'Stripe', location: 'Remote', description: 'Build the infrastructure of the internet economy...', source: 'LinkedIn', pay: '$150k/yr', postedDate: new Date().toISOString() },
-    ];
-    setJobs(mockJobs);
-    setLoading(false);
+    (async () => {
+      try {
+        const res = await fetch('/api/jobs');
+        if (res.ok) {
+          const remote = (await res.json()) as Job[];
+          if (Array.isArray(remote) && remote.length > 0) {
+            setJobs(remote);
+            return;
+          }
+        }
+      } catch {
+        /* use fallback */
+      }
+      setJobs(mockJobs.slice(0, 15));
+    })();
   }, []);
 
-  const filteredJobs = jobs.filter(job => 
-    job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.company.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredJobs = jobs.filter(job => {
+    // Search term filter
+    if (searchTerm && !job.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        !job.company.toLowerCase().includes(searchTerm.toLowerCase())) {
+      return false;
+    }
+
+    // Source filter
+    if (filters.source.length > 0 && !filters.source.includes(job.source)) {
+      return false;
+    }
+
+    // Work type filter
+    if (filters.workType.length > 0 && job.workType && !filters.workType.includes(job.workType)) {
+      return false;
+    }
+
+    // Location filter
+    if (filters.location && !job.location.toLowerCase().includes(filters.location.toLowerCase())) {
+      return false;
+    }
+
+    return true;
+  });
 
   return (
     <div className="space-y-10 pb-20">
@@ -63,11 +96,113 @@ export default function Search() {
             className="bg-transparent border-none focus:ring-0 text-base w-full font-medium"
           />
         </div>
-        <button className="flex items-center justify-center space-x-3 bg-white border border-stone-200 px-8 py-4 rounded-3xl font-black text-stone-600 hover:bg-stone-50 transition-all shadow-sm">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center justify-center space-x-3 bg-white border border-stone-200 px-8 py-4 rounded-3xl font-black text-stone-600 hover:bg-stone-50 transition-all shadow-sm relative"
+        >
           <Filter size={20} />
           <span className="text-sm uppercase tracking-widest">Filters</span>
+          {(filters.source.length > 0 || filters.workType.length > 0 || filters.location) && (
+            <span className="absolute -top-2 -right-2 w-5 h-5 bg-emerald-600 text-white text-xs rounded-full flex items-center justify-center font-bold">
+              {(filters.source.length || 0) + (filters.workType.length || 0) + (filters.location ? 1 : 0)}
+            </span>
+          )}
         </button>
       </div>
+
+      {/* Filters Panel */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-white p-8 rounded-3xl border border-stone-200 shadow-lg space-y-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg text-stone-900">Filters</h3>
+              <button
+                onClick={() => setShowFilters(false)}
+                className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {/* Source Filter */}
+              <div className="space-y-3">
+                <label className="font-bold text-sm text-stone-900 uppercase tracking-widest">Source</label>
+                <div className="space-y-2">
+                  {['Handshake', 'LinkedIn', 'Indeed', 'Google'].map(source => (
+                    <label key={source} className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filters.source.includes(source)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFilters({ ...filters, source: [...filters.source, source] });
+                          } else {
+                            setFilters({ ...filters, source: filters.source.filter(s => s !== source) });
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-stone-300 text-emerald-600"
+                      />
+                      <span className="text-sm text-stone-600">{source}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Work Type Filter */}
+              <div className="space-y-3">
+                <label className="font-bold text-sm text-stone-900 uppercase tracking-widest">Work Type</label>
+                <div className="space-y-2">
+                  {['In-person', 'Remote', 'Hybrid'].map(type => (
+                    <label key={type} className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filters.workType.includes(type)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFilters({ ...filters, workType: [...filters.workType, type] });
+                          } else {
+                            setFilters({ ...filters, workType: filters.workType.filter(w => w !== type) });
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-stone-300 text-emerald-600"
+                      />
+                      <span className="text-sm text-stone-600">{type}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Location Filter */}
+              <div className="space-y-3">
+                <label className="font-bold text-sm text-stone-900 uppercase tracking-widest">Location</label>
+                <input
+                  type="text"
+                  placeholder="City or region"
+                  value={filters.location}
+                  onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+                  className="w-full p-2 border border-stone-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Clear Filters */}
+              <div className="flex items-end">
+                <button
+                  onClick={() => setFilters({ source: [], workType: [], minPay: 0, maxPay: 200000, location: '' })}
+                  className="w-full px-4 py-2 bg-stone-100 text-stone-600 font-bold rounded-lg hover:bg-stone-200 transition-colors text-sm"
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-1 gap-6">
         {filteredJobs.map((job) => (
@@ -117,6 +252,7 @@ export default function Search() {
         job={selectedJob} 
         onClose={() => setSelectedJob(null)} 
         userProfile={userProfile}
+        isSaved={false}
       />
     </div>
   );
