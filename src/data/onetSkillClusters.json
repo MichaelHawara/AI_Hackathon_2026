@@ -1,0 +1,132 @@
+{
+  "source": "O*NET Content Model skill and occupation terminology (U.S. Department of Labor / Employment and Training Administration). This file contains a small curated subset of occupation-keyword → related skill lists for student-facing fit scoring. Full database: https://www.onetcenter.org/database.html",
+  "version": "1.0.0",
+  "clusters": [
+    {
+      "id": "software-dev",
+      "title": "Software & Applications",
+      "socExamples": ["15-1252.00", "15-1251.00"],
+      "keywords": ["software", "developer", "engineer", "programmer", "full stack", "backend", "frontend", "swe", "devops", "web developer", "applications"],
+      "skills": [
+        "Programming",
+        "Software Development",
+        "Complex Problem Solving",
+        "Critical Thinking",
+        "Systems Analysis",
+        "Systems Evaluation",
+        "Technology Design",
+        "Active Learning",
+        "Reading Comprehension",
+        "Writing"
+      ]
+    },
+    {
+      "id": "data-ml",
+      "title": "Data Science & Analytics",
+      "socExamples": ["15-2051.00", "15-1255.00"],
+      "keywords": ["data scientist", "data analyst", "machine learning", "ml engineer", "analytics", "bi developer", "sql", "tableau", "statistics"],
+      "skills": [
+        "Mathematics",
+        "Science",
+        "Programming",
+        "Critical Thinking",
+        "Complex Problem Solving",
+        "Judgment and Decision Making",
+        "Active Learning",
+        "Reading Comprehension",
+        "Systems Analysis",
+        "Writing"
+      ]
+    },
+    {
+      "id": "cyber",
+      "title": "Cybersecurity & IT Operations",
+      "socExamples": ["15-1212.00", "15-1232.00"],
+      "keywords": ["security", "cyber", "soc analyst", "information security", "network", "systems administrator", "it support", "cloud"],
+      "skills": [
+        "Monitoring",
+        "Critical Thinking",
+        "Complex Problem Solving",
+        "Reading Comprehension",
+        "Active Learning",
+        "Judgment and Decision Making",
+        "Systems Analysis",
+        "Systems Evaluation",
+        "Operations Analysis",
+        "Problem Sensitivity"
+      ]
+    },
+    {
+      "id": "pm-ux",
+      "title": "Product, Design & Project Coordination",
+      "socExamples": ["15-1299.08", "27-1024.00"],
+      "keywords": ["product manager", "project manager", "ux", "ui", "designer", "scrum", "agile", "business analyst"],
+      "skills": [
+        "Coordination",
+        "Critical Thinking",
+        "Active Listening",
+        "Speaking",
+        "Writing",
+        "Complex Problem Solving",
+        "Time Management",
+        "Judgment and Decision Making",
+        "Social Perceptiveness",
+        "Negotiation"
+      ]
+    },
+    {
+      "id": "finance",
+      "title": "Finance & Accounting",
+      "socExamples": ["13-2011.00", "13-2052.00"],
+      "keywords": ["financial analyst", "accounting", "auditor", "banking", "investment", "fp&a"],
+      "skills": [
+        "Mathematics",
+        "Critical Thinking",
+        "Reading Comprehension",
+        "Active Learning",
+        "Judgment and Decision Making",
+        "Complex Problem Solving",
+        "Writing",
+        "Speaking",
+        "Monitoring",
+        "Time Management"
+      ]
+    },
+    {
+      "id": "marketing",
+      "title": "Marketing & Communications",
+      "socExamples": ["11-2021.00", "27-3091.00"],
+      "keywords": ["marketing", "communications", "content", "social media", "brand", "growth"],
+      "skills": [
+        "Writing",
+        "Speaking",
+        "Active Listening",
+        "Social Perceptiveness",
+        "Persuasion",
+        "Critical Thinking",
+        "Reading Comprehension",
+        "Coordination",
+        "Time Management",
+        "Judgment and Decision Making"
+      ]
+    },
+    {
+      "id": "intern-early",
+      "title": "Internships & Early Career (general)",
+      "socExamples": [],
+      "keywords": ["intern", "internship", "co-op", "entry level", "new grad", "student", "graduate"],
+      "skills": [
+        "Active Learning",
+        "Reading Comprehension",
+        "Writing",
+        "Speaking",
+        "Critical Thinking",
+        "Learning Strategies",
+        "Social Orientation",
+        "Adaptability",
+        "Stress Tolerance",
+        "Cooperation"
+      ]
+    }
+  ]
+}

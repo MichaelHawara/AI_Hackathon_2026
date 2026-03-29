@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { GenerativeModel } from '@google/generative-ai';
-import type { Job } from '../types';
+import type { Job, UserProfile } from '../types';
+import collegeHints from '../data/collegeScorecardSample.json';
 import { stripAiPreamble } from '../utils/aiOutput';
 
 function buildJobContextBlock(job: Job): string {
@@ -148,6 +149,79 @@ export async function getCareerAdvice(message: string, userProfile: unknown) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text();
+  });
+}
+
+const JOB_COACH_INSTRUCTION = `You are a concise "role coach" for students. This chat is scoped to ONE job posting.
+Priorities:
+- Suggest concrete skills to build or strengthen for THIS role.
+- Name learning resources (courses, docs, books, practice projects) when possible.
+- Connect advice to the student's existing profile without inventing experience they do not have.
+- Acknowledge uncertainty: hiring is competitive; encourage preparation and networking.
+- Optionally reference that workforce skill expectations can be explored via O*NET-style occupational skills (U.S. DOL) when relevant.
+Education ROI context (sample institutions only — not personalized financial advice): ${JSON.stringify(collegeHints.institutions.slice(0, 2))}`;
+
+export async function getJobCoachReply(
+  message: string,
+  job: Job,
+  userProfile: UserProfile | null,
+  fitSummary: string,
+  history: { role: 'user' | 'bot'; text: string }[]
+): Promise<string> {
+  const ctx = buildJobContextBlock(job);
+  const hist = history
+    .slice(-8)
+    .map((m) => `${m.role === 'user' ? 'Student' : 'Coach'}: ${m.text}`)
+    .join('\n');
+  const prompt = `${JOB_COACH_INSTRUCTION}
+
+${ctx}
+
+Profile fit summary (transparent estimate): ${fitSummary}
+
+Student profile (may be partial): ${JSON.stringify(userProfile ?? {})}
+
+Recent conversation:
+${hist}
+
+Student message: ${message}
+
+Reply in plain text, structured with short bullets if helpful. Under 500 words unless the student asks for detail.`;
+  return withModelFallback(async (model) => {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
+  });
+}
+
+/** Parse plain resume text into profile fields (merge with existing profile on the client). */
+export async function parseResumeToProfile(resumeText: string): Promise<Partial<UserProfile>> {
+  const prompt = `Extract structured data from the resume text below for a student career app.
+Return ONLY valid JSON with these optional keys (omit keys you cannot support):
+{
+  "fullName": string,
+  "email": string,
+  "phone": string,
+  "address": string,
+  "skills": string[],
+  "experience": [{"company": string, "role": string, "startDate": string, "endDate": string, "description": string}],
+  "education": [{"school": string, "degree": string, "major": string, "graduationDate": string}],
+  "projects": [{"name": string, "description": string, "technologies": string[], "url": string}],
+  "certifications": [{"name": string, "issuingOrganization": string, "issueDate": string, "expirationDate": string}]
+}
+Rules:
+- Never invent employers, degrees, or jobs not clearly implied by the resume.
+- Use empty strings for unknown dates.
+- At most 40 skills.
+- If the text is not a resume, return {"skills":[]}.
+
+RESUME TEXT:
+${resumeText.slice(0, 24000)}`;
+  return withJsonModelFallback(async (model) => {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const raw = JSON.parse(response.text()) as Partial<UserProfile>;
+    return raw;
   });
 }
 

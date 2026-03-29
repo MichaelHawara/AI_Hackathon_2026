@@ -115,3 +115,20 @@ export interface UserDocument {
   jobTitle?: string;
   jobCompany?: string;
 }
+
+/**
+ * Transparent, explainable estimate of how well a student's profile aligns with a posting.
+ * Not a guarantee of interview or offer — see `disclaimer` (Avanade: decision support, not replacement).
+ */
+export interface ApplicationFitEstimate {
+  /** 0–95 — we cap below 100 to communicate irreducible uncertainty */
+  score: number;
+  label: string;
+  confidence: 'low' | 'medium' | 'high';
+  factors: { label: string; detail: string }[];
+  disclaimer: string;
+  /** Best-matching O*NET-oriented cluster label, if any */
+  onetClusterTitle?: string;
+  /** Skills from our O*NET-derived reference that overlap the student + posting */
+  matchedOnetSkills: string[];
+}

@@ -160,13 +160,13 @@ The repo separates the **React client** (`src/`), the **Node server** (`server/`
 | `services/` | Client helpers (e.g. Gemini, LinkedIn-related calls) |
 | `utils/` | PDF export, document download, job links, transcript helpers |
 | `types/` | Shared TypeScript types (also imported by `server/` for API payloads) |
-| `data/` | Mock/sample data (e.g. jobs) |
+| `data/` | Mock jobs, `onetSkillClusters.json` (O*NET-style clusters), `collegeScorecardSample.json` (illustrative ROI context) |
 
 ### `server/` — backend (Express)
 
 | File | Role |
 |------|------|
-| `index.ts` | Entrypoint: JSON API (`/api/health`, `/api/jobs`, LinkedIn import), Vite middleware in dev, static `dist/` + SPA fallback in production |
+| `index.ts` | Entrypoint: JSON API (`/api/health`, `/api/jobs`, `/api/metrics`, LinkedIn import), Vite middleware in dev, static `dist/` + SPA fallback in production |
 | `jobsAggregator.ts` | Aggregates jobs from public RSS/APIs (e.g. Indeed, LinkedIn RSS, Google Careers) plus Handshake samples from mock data |
 | `linkedinScrape.ts` | Fallback scrape of public LinkedIn HTML when needed |
 | `relevanceLinkedIn.ts` | Relevance AI webhook integration for structured profile import |
@@ -177,6 +177,9 @@ The repo separates the **React client** (`src/`), the **Node server** (`server/`
 |------|------|
 | `IMPLEMENTATION_GUIDE.md` | Deeper feature / implementation notes |
 | `LINKEDIN_SCRAPING_AND_JOBS.txt` | Notes on LinkedIn and job sources |
+| `CHALLENGE_COMPLIANCE.txt` | Avanade-style challenge: prompt fit, data sources, bias, student impact |
+| `DATASET_INTEGRATION_AND_TESTING.txt` | How datasets/AI are wired; how to test; improvement ideas |
+| `DEVOPS_AND_MONITORING.md` | Post-deploy monitoring, NIST AI RMF–style lifecycle, metrics |
 | `metadata.json` | Project metadata (e.g. tooling / studio manifests) |
 
 ### `firebase/`
@@ -220,8 +223,8 @@ documents/{docId}
 
 1. **Sign Up** → Choose Google or Email authentication
 2. **Onboarding** → Fill 3 steps of profile information
-3. **LinkedIn Import** → Auto-fill data (optional)
-4. **View Home** → See personalized job recommendations
+3. **LinkedIn import** or **resume PDF upload** on Account → AI-assisted profile fields (review before saving)
+4. **View Home** → Jobs with O*NET-informed alignment scores and explanations
 
 ### Finding & Applying Jobs
 
@@ -259,7 +262,10 @@ documents/{docId}
 
 - ✅ Resume generation and customization
 - ✅ Cover letter generation
-- ✅ Career chatbot
+- ✅ Career chatbot (student-oriented copy)
+- ✅ **Resume PDF → profile** (Gemini structured extract; review on Account)
+- ✅ **Application alignment scores** (transparent TypeScript + O*NET-style clusters; not a hiring guarantee)
+- ✅ **Per-job Role coach** (Gemini: skills to learn, resources, pathway hints for that posting)
 - ✅ Transcript analysis
 
 ### Document Management
@@ -379,6 +385,9 @@ For issues and contributions:
 For help, refer to:
 
 - [Implementation guide](./docs/IMPLEMENTATION_GUIDE.md) — feature documentation
+- [Challenge compliance & student impact](./docs/CHALLENGE_COMPLIANCE.txt) — prompt alignment, bias, significance
+- [Dataset integration & testing](./docs/DATASET_INTEGRATION_AND_TESTING.txt) — data sources, how to verify features
+- [DevOps & monitoring](./docs/DEVOPS_AND_MONITORING.md) — lifecycle monitoring and governance
 - [LinkedIn / jobs notes](./docs/LINKEDIN_SCRAPING_AND_JOBS.txt) — scraping and job sources
 - [Firebase Docs](https://firebase.google.com/docs)
 - [Google Gemini API](https://ai.google.dev/)

@@ -21,6 +21,19 @@ async function startServer() {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
+  /** Lightweight ops metadata for demos (DevOps / lifecycle documentation). */
+  app.get("/api/metrics", (_req, res) => {
+    res.json({
+      service: "careerpath-ai",
+      datasets: [
+        "onet-skill-clusters-v1 (src/data/onetSkillClusters.json)",
+        "live-job-feeds (Indeed RSS, LinkedIn RSS, Google Careers API)",
+        "college-scorecard-sample (src/data/collegeScorecardSample.json)",
+      ],
+      docs: ["docs/CHALLENGE_COMPLIANCE.txt", "docs/DATASET_INTEGRATION_AND_TESTING.txt", "docs/DEVOPS_AND_MONITORING.md"],
+    });
+  });
+
   app.get("/api/jobs", async (_req, res) => {
     try {
       const jobs = await aggregateRemoteJobs();

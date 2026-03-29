@@ -4,6 +4,27 @@ LINKEDIN IMPORT (RELEVANCE AI) AND REMOTE JOBS — STEP-BY-STEP
 This file describes how the app pulls LinkedIn profile data and aggregates job
 listings. It maps each step to the code that implements it.
 
+WHY “WEB SCRAPING” OFTEN FAILS (READ THIS FIRST)
+-----------------------------------------------
+LinkedIn is not designed to allow anonymous server-side HTML scraping:
+
+• HTTP 999 — LinkedIn’s custom “Request denied” for suspected bots (very common
+  from cloud/datacenter IPs and from Node `fetch` without a real browser session).
+
+• Login / authwall / challenge HTML — You get a sign-in or checkpoint page
+  instead of public profile markup, so JSON-LD and Open Graph tags are missing.
+
+• Profile must be public — Private profiles cannot be read without OAuth.
+
+• Relevance AI runs *before* the HTML scraper in `server/index.ts`. If the
+  webhook returns usable profile JSON, scraping is skipped. If Relevance fails
+  or returns an error, the app falls back to `scrapeLinkedInProfile` in
+  `server/linkedinScrape.ts`, which is where most “it doesn’t work” reports come from.
+
+What to do: configure `RELEVANCEAI_WEBHOOK_URL` / `RELEVANCEAI_API_KEY`, use
+**Resume → profile (AI)** on Account, or paste experience manually. Do not expect
+reliable long-term scraping without official API access.
+
 
 PART A — ENVIRONMENT
 --------------------
@@ -29,7 +50,7 @@ calls `importLinkedInProfile` in `src/services/linkedin.ts`.
 Step 2. That function POSTs JSON `{ profileUrl }` to `POST /api/linkedin-import`
 (same origin in dev when Express + Vite run together).
 
-Step 3. `server.ts` validates the body, then calls `normalizeLinkedInUrl` from
+Step 3. `server/index.ts` validates the body, then calls `normalizeLinkedInUrl` from
 `linkedinScrape.ts` so only well-formed public-style `/in/...` URLs proceed.
 
 Step 4. The server calls `importLinkedInViaRelevance` in `relevanceLinkedIn.ts`.
@@ -37,11 +58,68 @@ Step 4. The server calls `importLinkedInViaRelevance` in `relevanceLinkedIn.ts`.
 Functions:
 - `src/services/linkedin.ts` — HTTP client for `/api/linkedin-import`
 - `normalizeLinkedInUrl` — `linkedinScrape.ts`
-- Route handler — `server.ts` (`POST /api/linkedin-import`)
+- Route handler — `server/index.ts` (`POST /api/linkedin-import`)
 
 
-PART C — RELEVANCE AI WEBHOOK REQUEST
--------------------------------------
+PART C — RELEVANCE AI (SYNC WEBHOOK VS ASYNC)
+---------------------------------------------
+• **Synchronous** `trigger_webhook`: POST body `{"url","name"}`. Times out around
+  **30 seconds** — fine for fast tools only.
+
+• **Asynchronous** `trigger_async` + `async_poll`: implemented in
+  `importLinkedInViaRelevanceAsync` in `relevanceLinkedIn.ts`. Enabled when
+  `RELEVANCEAI_REGION`, `RELEVANCEAI_TOOL_ID`, and `RELEVANCEAI_PROJECT_ID` are
+  all set (see `.env.example`). Authorization header is
+  `project_id:api_key` from the API Keys page (or `RELEVANCEAI_AUTHORIZATION`).
+
+• Async POST body: `{"params":{"url":"<linkedin>","name":""},"project":"<project_id>"}`.
+  Your Relevance tool must accept those **param** names (or change the tool’s
+  input schema to match).
+
+• Set `RELEVANCEAI_USE_ASYNC=false` to force the sync webhook even if async
+  env vars are present.
+
+
+PART D — RELEVANCE AI WEBHOOK REQUEST (SYNC)
+--------------------------------------------
+TROUBLESHOOTING (if import shows a red “Relevance failed” message or empty data):
+
+• You MUST set `RELEVANCEAI_WEBHOOK_URL` to **your** Relevance project’s
+  `trigger_webhook` URL. The hard-coded `DEFAULT_WEBHOOK` in
+  `server/relevanceLinkedIn.ts` is only a demo and may return 401/404 or an
+  empty payload for your account.
+
+• After changing `.env.local`, restart `npm run dev` (server reads env at startup).
+
+• If Relevance returns HTTP 401/403, check `RELEVANCEAI_API_KEY` (copy exactly
+  from Relevance; add `Bearer ` prefix only if their UI shows that format).
+
+• If Relevance returns **HTTP 405** on a correct POST: the HTTP client may have
+  followed a redirect with **GET** (webhooks are POST-only). This codebase uses
+  `postTriggerWebhook` in `relevanceLinkedIn.ts` to follow `Location` while
+  repeating POST with the same JSON body.
+
+• **30-second synchronous limit (Relevance UI):** “Synchronous triggers” only
+  wait ~30s. If your tool chain (scrape + LLM) runs longer, the webhook can
+  return a timeout or incomplete body → “Could not parse profile fields.” Fix:
+  shorten the tool, split steps, or use Relevance’s **asynchronous** trigger API
+  (see their docs). This app’s server expects a **complete JSON body** on the
+  same HTTP response.
+
+• If HTTP 200 but “Could not parse profile fields”, your agent’s output JSON
+  does not match what `mapRelevanceOutputToProfile` expects (nested
+  `output`/`result`/`data` with `fullName` or `experience`/`skills` arrays).
+  Inspect the server console: we log the first ~500 chars of the response.
+
+• **Minimal shapes that work** (inside `output` / top-level, or under `result`/`data`):
+  - At least one of: `fullName` or `full_name` or `name`, **or** `headline`, **or**
+    `experience` / `experiences` array, **or** non-empty `skills` array.
+  Example:
+  `{"fullName":"Jane Doe","headline":"Student","skills":["Python","SQL"],"experience":[{"title":"Intern","company":"Acme","description":"..."}]}`
+
+• The UI now surfaces `relevanceError` + scrape `error` in `importHint` when
+  the server responds with 422.
+
 Step 1. `importLinkedInViaRelevance` POSTs to the webhook URL. If
 `RELEVANCEAI_API_KEY` is set, it adds `Authorization: <key>`; otherwise the
 header is omitted.
@@ -63,7 +141,7 @@ Functions:
   — `relevanceLinkedIn.ts`
 
 
-PART D — PRIVATE PROFILE DETECTION
+PART E — PRIVATE PROFILE DETECTION
 ----------------------------------
 Step 1. After a successful HTTP response from Relevance, `detectPrivateProfile`
 scans the full response text and recursively collected string fields from the
@@ -82,7 +160,7 @@ Functions:
 - `collectStrings` / `textFromPayload` — helpers in `relevanceLinkedIn.ts`
 
 
-PART E — MAPPING RELEVANCE OUTPUT TO APP PROFILE
+PART F — MAPPING RELEVANCE OUTPUT TO APP PROFILE
 ------------------------------------------------
 Step 1. `mapRelevanceOutputToProfile` accepts arbitrary JSON and looks for
 common shapes: `output`, `result`, or `data` wrappers, then fields such as
@@ -102,7 +180,7 @@ Functions:
 - `pickString`, `asRecord` — `relevanceLinkedIn.ts`
 
 
-PART F — FALLBACK SCRAPE (WHEN RELEVANCE DOES NOT SUCCEED)
+PART G — FALLBACK SCRAPE (WHEN RELEVANCE DOES NOT SUCCEED)
 ----------------------------------------------------------
 Step 1. If Relevance does not return a full success (e.g. missing API key,
 HTTP error, or empty parse), `server.ts` calls `scrapeLinkedInProfile` from
@@ -141,7 +219,7 @@ Functions:
   `fetchGoogleCareersJobs`, `handshakeSamples` — `jobsAggregator.ts`
 
 
-PART H — PDF DOCUMENTS (SEPARATE FROM LINKEDIN)
+PART I — PDF DOCUMENTS (SEPARATE FROM LINKEDIN)
 -----------------------------------------------
 Step 1. Document upload uses a file input accepting PDF; the browser runs
 `extractPdfText` (`src/utils/extractPdfText.ts`) using pdf.js to extract text.

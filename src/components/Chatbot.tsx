@@ -9,7 +9,10 @@ export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'bot'; text: string }[]>([
-    { role: 'bot', text: "Hi! I'm your AI Career Assistant. How can I help you today?" }
+    {
+      role: 'bot',
+      text: "Hi — I'm your CareerPath assistant for students. Ask about internships, skills, interviews, or balancing school and job search. I'll be honest about what we can and can't predict."
+    }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);

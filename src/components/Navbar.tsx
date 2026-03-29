@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Search, Briefcase, FileText, User, LogOut } from 'lucide-react';
 import { auth, signOut } from '../firebase';
+import { BRAND_LOGO_TRANSPARENT } from '../branding';
 
 export default function Navbar() {
   const location = useLocation();
@@ -16,8 +17,14 @@ export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 bg-white border-b border-stone-200 z-50">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-emerald-700 tracking-tight">
-          CareerPath AI
+        <Link to="/" className="flex items-center shrink-0">
+          <img
+            src={BRAND_LOGO_TRANSPARENT}
+            alt="CareerPath AI"
+            className="h-8 sm:h-9 w-auto max-w-[200px] object-contain object-left"
+            width={200}
+            height={40}
+          />
         </Link>
         
         <div className="hidden md:flex items-center space-x-8">

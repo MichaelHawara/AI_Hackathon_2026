@@ -1,0 +1,30 @@
+{
+  "source": "U.S. Department of Education College Scorecard — sample institution-level fields for student-facing context (earnings/debt are illustrative snapshots; use https://collegescorecard.ed.gov/data for full datasets).",
+  "version": "1.0.0",
+  "institutions": [
+    {
+      "name": "Example Public University A",
+      "state": "CA",
+      "medianEarnings10yr": 62000,
+      "medianDebt": 18500,
+      "graduationRate": 0.78,
+      "note": "Illustrative row for demo — replace with API results when COLLEGE_SCORECARD_API_KEY is set."
+    },
+    {
+      "name": "Example Liberal Arts College B",
+      "state": "MA",
+      "medianEarnings10yr": 58000,
+      "medianDebt": 22000,
+      "graduationRate": 0.85,
+      "note": "Earnings do not measure satisfaction or well-being (per challenge guidance)."
+    },
+    {
+      "name": "Example Technical Institute C",
+      "state": "TX",
+      "medianEarnings10yr": 54000,
+      "medianDebt": 12000,
+      "graduationRate": 0.62,
+      "note": "Use cautiously for comparisons — geographic and field-of-study bias may apply."
+    }
+  ]
+}

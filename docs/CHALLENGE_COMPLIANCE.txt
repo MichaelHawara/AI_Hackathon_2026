@@ -1,0 +1,59 @@
+CareerPath AI — Avanade Challenge Track A Compliance Narrative
+================================================================
+Reference prompt: "AI for the Future of Work" — reduce uncertainty and stress for people navigating the workforce (especially students), with fair, transparent, responsible systems from development through operations.
+
+1. HOW THE APP ADDRESSES THE PROMPT (exploration → preparation → applications → early career)
+-------------------------------------------------------------------------------------------
+• Exploration: Home and Search surfaces aggregated job postings from public RSS/API feeds (Indeed, LinkedIn job RSS, Google Careers) plus curated samples, so students see real market signals—not only mock data.
+
+• Preparation: O*NET-inspired occupational skill clusters (U.S. Department of Labor terminology, bundled in src/data/onetSkillClusters.json) power transparent "application alignment" scores. The per-job "Role coach" uses Google Gemini with the posting, the student profile, and fit-summary context to suggest skills to build and learning resources—decision support, not a verdict on the student’s worth.
+
+• Applications: Resume and cover letter generation remain available; users can upload a PDF resume on Account for AI-assisted extraction into profile fields (review required before saving).
+
+• Early career: Messaging, disclaimers, and student-oriented copy emphasize uncertainty, competition, and the limits of any automated estimate.
+
+2. REAL-WORLD DATA SOURCES (required constraint)
+-------------------------------------------------
+We satisfy "at least one real-world data source" in multiple ways:
+
+a) Live job data: The dev server (server/jobsAggregator.ts) fetches current public job listings from real endpoints where available.
+
+b) O*NET alignment layer: Skill clusters and SOC code examples in onetSkillClusters.json are derived from the O*NET Content Model (U.S. DOL / ETA). The full database is at https://www.onetcenter.org/database.html — our file is a small curated subset for student UX, not a full O*NET mirror.
+
+c) College Scorecard–style context: src/data/collegeScorecardSample.json holds illustrative institution-level fields and disclaimers; the app references College Scorecard themes (ROI, debt, earnings limitations) in AI prompts. For production analytics, teams should register for the official College Scorecard API (https://collegescorecard.ed.gov/data).
+
+3. BIAS AND FAIRNESS (required constraint)
+------------------------------------------
+Identified biases (non-exhaustive):
+• Geographic bias: Aggregated feeds skew toward U.S. listings and English-language postings.
+• Representation bias: Tech-heavy internship filters may underrepresent non-tech pathways.
+• Proxy bias: "Alignment %" uses keyword overlap and O*NET cluster overlap—imperfect proxies for qualification or employer intent.
+• Historical bias: O*NET reflects past occupational patterns; future roles may differ.
+
+Mitigations implemented in-product:
+• Scores are capped below 100% and labeled as alignment estimates, not hiring probability.
+• Expandable "Why this score?" explains factors (skills vs. posting, cluster match, experience overlap).
+• Prominent disclaimer: decision support only; hiring depends on many unobserved factors.
+• Human-in-the-loop: Students must review AI-parsed resume fields before saving.
+• Optional future: subgroup reporting by region or school (see DEVOPS_AND_MONITORING.md).
+
+4. TRANSPARENCY AND UNCERTAINTY (design principles)
+---------------------------------------------------
+• Fit scoring is implemented in plain TypeScript (src/services/fitScore.ts)—no black box for the numeric score.
+• Gemini is used where natural-language reasoning adds value (resume parsing, role coach); limitations are stated in UI copy.
+• We avoid claiming the model "knows" whether an applicant will be selected.
+
+5. DEV + OPS (lifecycle thinking)
+---------------------------------
+See docs/DEVOPS_AND_MONITORING.md for post-deployment monitoring, drift, data quality, fairness metrics, and feedback loops, aligned with NIST AI RMF themes (Map, Measure, Manage, Govern).
+
+6. SIGNIFICANCE AND STUDENT IMPACT
+----------------------------------
+Many students face opaque job markets and anxiety about "whether they are good enough." CareerPath AI frames alignment as contextual and improvable, links suggestions to learning paths, and pairs automation with explicit uncertainty—supporting informed, lower-stress decisions rather than replacing human judgment.
+
+7. TAILORING TOWARD STUDENTS
+----------------------------
+• Internship/early-career language and clusters (e.g. "intern" keyword cluster).
+• Role coach answers emphasize learning resources and skill-building.
+• Resume upload lowers friction for first-time profile completion.
+• Earnings/debt context is framed cautiously (well-being and satisfaction are not captured by salary alone).

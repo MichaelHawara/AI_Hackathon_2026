@@ -5,6 +5,7 @@ import { Job, UserProfile } from '../types';
 import { db, auth, doc, getDoc } from '../firebase';
 import JobModal from '../components/JobModal';
 import { mockJobs } from '../data/mockJobs';
+import { computeApplicationFit } from '../services/fitScore';
 
 export default function Search() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -220,7 +221,14 @@ export default function Search() {
                 <Briefcase size={32} />
               </div>
               <div>
-                <h3 className="font-black text-xl text-stone-900 group-hover:text-emerald-600 transition-colors">{job.title}</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-black text-xl text-stone-900 group-hover:text-emerald-600 transition-colors">{job.title}</h3>
+                  {userProfile && (
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800">
+                      {computeApplicationFit(job, userProfile).score}% align
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-wrap items-center gap-4 mt-2">
                   <span className="text-emerald-600 font-black text-sm">{job.company}</span>
                   <div className="flex items-center text-stone-400 text-xs font-bold">
@@ -229,7 +237,7 @@ export default function Search() {
                   </div>
                   <div className="flex items-center text-stone-400 text-xs font-bold">
                     <DollarSign size={14} className="mr-1" />
-                    <span>{job.pay}</span>
+                    <span>{job.pay ?? '—'}</span>
                   </div>
                 </div>
               </div>

@@ -1,9 +1,34 @@
 /**
  * Server-only: fetch a public LinkedIn profile page and extract public metadata (JSON-LD, Open Graph).
- * LinkedIn often returns a login wall to automated requests; behavior varies by IP and rate limits.
+ *
+ * Why this usually "doesn't work":
+ * - LinkedIn aggressively blocks unauthenticated programmatic access (HTTP 999, login walls, challenges).
+ * - Server/datacenter IPs are flagged more often than residential browsers.
+ * - The HTML no longer reliably embeds full profile JSON-LD for anonymous crawlers.
+ *
+ * Prefer: Relevance AI webhook (see relevanceLinkedIn.ts), official LinkedIn APIs (partner program),
+ * or resume upload + manual edit in the app.
  */
 import * as cheerio from "cheerio";
 import { randomUUID } from "crypto";
+
+/** Headers that resemble a real browser navigation (still may be blocked by LinkedIn). */
+const BROWSER_HEADERS: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+  "Upgrade-Insecure-Requests": "1",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+};
 
 export type ScrapedExperience = {
   id: string;
@@ -63,21 +88,44 @@ export async function scrapeLinkedInProfile(profileUrl: string): Promise<LinkedI
   let html: string;
   try {
     const res = await fetch(normalized, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-      },
+      headers: BROWSER_HEADERS,
       redirect: "follow",
     });
+
+    // LinkedIn uses non-standard 999 for "Request denied" (bot / abuse detection).
+    if (res.status === 999) {
+      return {
+        error:
+          "LinkedIn returned HTTP 999 (request denied). They block many automated and datacenter requests—this is expected for server-side scraping. Use Relevance AI import if configured, try from another network, or add your experience manually.",
+        authWall: true,
+      };
+    }
+    if (res.status === 403 || res.status === 429) {
+      return {
+        error: `LinkedIn returned HTTP ${res.status} (forbidden or rate-limited). Wait and retry, or use Relevance AI / manual entry.`,
+        authWall: true,
+      };
+    }
     if (!res.ok) {
-      return { error: `LinkedIn returned HTTP ${res.status}.` };
+      return {
+        error: `LinkedIn returned HTTP ${res.status}. Public HTML scraping may be unavailable from this environment.`,
+        authWall: res.status >= 400,
+      };
     }
     html = await res.text();
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Network error fetching profile." };
+  }
+
+  // Sometimes a 200 body is still an interstitial / denial page.
+  if (
+    /request denied|http\/\s*1\.1\s*999|non-human traffic|unusual traffic/i.test(html.slice(0, 12000))
+  ) {
+    return {
+      error:
+        "LinkedIn served a bot-detection or “request denied” page instead of profile HTML. Scraping from this IP/environment is not reliable.",
+      authWall: true,
+    };
   }
 
   if (

@@ -38,6 +38,7 @@ import type {
   VolunteerExperience,
   Certification
 } from '../types';
+import { BRAND_LOGO_TRANSPARENT } from '../branding';
 
 const inputClass =
   'w-full p-4 bg-stone-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 text-sm';
@@ -67,7 +68,8 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(false);
   const [linkedInLoading, setLinkedInLoading] = useState(false);
   const [linkedInNotice, setLinkedInNotice] = useState<{
-    kind: 'ok-api' | 'scraped' | 'saved-url' | 'private';
+    kind: 'ok-api' | 'scraped' | 'saved-url' | 'private' | 'relevance-failed';
+    detail?: string;
   } | null>(null);
   const [skillDraft, setSkillDraft] = useState('');
 
@@ -203,33 +205,38 @@ export default function Onboarding() {
     setLinkedInNotice(null);
     try {
       const imported = await importLinkedInProfile(url || undefined);
+      const { importHint, ...importedRest } = imported;
       setFormData((f) => ({
         ...f,
-        ...imported,
-        experience: imported.experience?.length ? imported.experience : f.experience,
-        education: imported.education?.length ? imported.education : f.education,
-        projects: imported.projects?.length ? imported.projects : f.projects,
-        researchPapers: imported.researchPapers?.length ? imported.researchPapers : f.researchPapers,
-        volunteerExperience: imported.volunteerExperience?.length
-          ? imported.volunteerExperience
+        ...importedRest,
+        experience: importedRest.experience?.length ? importedRest.experience : f.experience,
+        education: importedRest.education?.length ? importedRest.education : f.education,
+        projects: importedRest.projects?.length ? importedRest.projects : f.projects,
+        researchPapers: importedRest.researchPapers?.length ? importedRest.researchPapers : f.researchPapers,
+        volunteerExperience: importedRest.volunteerExperience?.length
+          ? importedRest.volunteerExperience
           : f.volunteerExperience,
-        certifications: imported.certifications?.length ? imported.certifications : f.certifications,
-        skills: imported.skills?.length ? imported.skills : f.skills,
-        linkedInProfileUrl: imported.linkedInProfileUrl || f.linkedInProfileUrl
+        certifications: importedRest.certifications?.length ? importedRest.certifications : f.certifications,
+        skills: importedRest.skills?.length ? importedRest.skills : f.skills,
+        linkedInProfileUrl: importedRest.linkedInProfileUrl || f.linkedInProfileUrl
       }));
       setError('');
       const enriched = !!(
-        imported.experience?.length ||
-        imported.skills?.length ||
-        imported.fullName
+        importedRest.experience?.length ||
+        importedRest.skills?.length ||
+        importedRest.fullName
       );
-      setLinkedInNotice(
-        import.meta.env.VITE_LINKEDIN_IMPORT_API?.trim()
-          ? { kind: 'ok-api' }
-          : enriched
-            ? { kind: 'scraped' }
-            : { kind: 'saved-url' }
-      );
+      if (importHint) {
+        setLinkedInNotice({ kind: 'relevance-failed', detail: importHint });
+      } else {
+        setLinkedInNotice(
+          import.meta.env.VITE_LINKEDIN_IMPORT_API?.trim()
+            ? { kind: 'ok-api' }
+            : enriched
+              ? { kind: 'scraped' }
+              : { kind: 'saved-url' }
+        );
+      }
     } catch (e) {
       if (e instanceof PrivateLinkedInProfileError) {
         setLinkedInNotice({ kind: 'private' });
@@ -391,7 +398,9 @@ export default function Onboarding() {
                     ? 'bg-sky-50 border-sky-200 text-sky-950'
                     : linkedInNotice.kind === 'private'
                       ? 'bg-amber-50 border-amber-200 text-amber-950'
-                      : 'bg-stone-50 border-stone-200 text-stone-700'
+                      : linkedInNotice.kind === 'relevance-failed'
+                        ? 'bg-rose-50 border-rose-200 text-rose-950'
+                        : 'bg-stone-50 border-stone-200 text-stone-700'
               }`}
             >
               {linkedInNotice.kind === 'ok-api'
@@ -400,7 +409,9 @@ export default function Onboarding() {
                   ? 'Imported public fields from your LinkedIn page (server scrape). Review and edit below.'
                   : linkedInNotice.kind === 'private'
                     ? 'This profile looks private or not visible to our import. Set it to public and try again, or add experience manually.'
-                    : 'Your LinkedIn URL is saved. If nothing imported, LinkedIn may have blocked access—add experience and skills below.'}
+                    : linkedInNotice.kind === 'relevance-failed'
+                      ? `Relevance AI did not return usable data. ${linkedInNotice.detail ?? ''} Configure RELEVANCEAI_WEBHOOK_URL + RELEVANCEAI_API_KEY in .env.local and restart the dev server.`
+                      : 'Your LinkedIn URL is saved. If nothing imported, LinkedIn may have blocked access—add experience and skills below.'}
             </div>
           )}
 
@@ -749,6 +760,13 @@ export default function Onboarding() {
           <div className="absolute -bottom-24 left-1/4 w-64 h-64 bg-amber-100/50 rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 max-w-7xl mx-auto px-4 pt-20 pb-32 flex flex-col items-center text-center">
+          <img
+            src={BRAND_LOGO_TRANSPARENT}
+            alt="CareerPath AI"
+            className="h-12 md:h-14 w-auto max-w-[min(100%,280px)] object-contain mb-8"
+            width={280}
+            height={56}
+          />
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -807,6 +825,13 @@ export default function Onboarding() {
           className="w-full max-w-md bg-white rounded-[2.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] border border-stone-100 overflow-hidden p-10"
         >
           <div className="text-center mb-10">
+            <img
+              src={BRAND_LOGO_TRANSPARENT}
+              alt=""
+              className="mx-auto h-10 w-auto max-w-[200px] object-contain mb-6"
+              width={200}
+              height={40}
+            />
             <h2 className="text-3xl font-black text-stone-900 tracking-tight mb-2">
               {authMode === 'signup' ? 'Create Account' : 'Welcome Back'}
             </h2>

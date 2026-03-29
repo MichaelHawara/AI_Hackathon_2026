@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MapPin, DollarSign, Clock, ExternalLink, FileText, FileCode, Sparkles, Loader2, Bookmark, BookmarkCheck, Eye, CheckCircle, FileDown } from 'lucide-react';
 import Markdown from 'react-markdown';
@@ -7,6 +7,9 @@ import { generateResume, generateCoverLetter, formatGeminiError } from '../servi
 import { downloadUserContentAsPdf, downloadAsMarkdownFile } from '../utils/documentDownload';
 import { getJobApplyUrl } from '../utils/jobLinks';
 import { db, auth, collection, addDoc, serverTimestamp, doc, setDoc, deleteDoc, query, where, onSnapshot, onAuthStateChanged } from '../firebase';
+import ApplicationFitPanel from './ApplicationFitPanel';
+import JobCoachChat from './JobCoachChat';
+import { computeApplicationFit } from '../services/fitScore';
 
 interface JobModalProps {
   job: Job | null;
@@ -67,7 +70,9 @@ export default function JobModal({ job, onClose, userProfile, isSaved = false, o
     };
   }, [job?.id]);
 
-  if (!job) return null;
+  const fit = useMemo(() => (job ? computeApplicationFit(job, userProfile) : null), [job, userProfile]);
+
+  if (!job || !fit) return null;
 
   if (previewType && previewContent) {
     return (
@@ -196,7 +201,7 @@ export default function JobModal({ job, onClose, userProfile, isSaved = false, o
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
-          className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         >
           <div className="p-6 border-b border-stone-100 flex items-center justify-between">
             <h2 className="text-xl font-bold text-stone-900">Job Details</h2>
@@ -227,7 +232,7 @@ export default function JobModal({ job, onClose, userProfile, isSaved = false, o
                 </div>
                 <div className="flex items-center">
                   <DollarSign size={16} className="mr-2" />
-                  <span>{job.pay}</span>
+                  <span>{job.pay ?? 'Not listed'}</span>
                 </div>
                 <div className="flex items-center">
                   <Clock size={16} className="mr-2" />
@@ -242,6 +247,8 @@ export default function JobModal({ job, onClose, userProfile, isSaved = false, o
             </div>
 
             <div className="space-y-4">
+              <ApplicationFitPanel fit={fit} />
+
               <section>
                 <h3 className="font-bold text-stone-900 mb-2 uppercase text-xs tracking-widest">Description</h3>
                 <p className="text-stone-600 leading-relaxed whitespace-pre-wrap">{job.description}</p>
@@ -259,6 +266,8 @@ export default function JobModal({ job, onClose, userProfile, isSaved = false, o
                   </div>
                 </section>
               )}
+
+              <JobCoachChat job={job} userProfile={userProfile} fit={fit} />
 
               <section className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100">
                 <div className="flex items-center space-x-2 mb-4">

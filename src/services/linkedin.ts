@@ -98,13 +98,19 @@ export function parseLinkedInProfileUrl(input: string): string | null {
   }
 }
 
+/** Return type for `importLinkedInProfile`. `importHint` is UI-only — do not persist to Firestore. */
+export type LinkedInImportResult = Partial<UserProfile> & {
+  /** Set when the server returns 422: Relevance and/or HTML scrape both failed; explains why */
+  importHint?: string;
+};
+
 /**
  * Imports profile data: optional legacy `VITE_LINKEDIN_IMPORT_API`, then
- * `POST /api/linkedin-import` (Relevance AI + HTML fallback on the server).
+ * `POST /api/linkedin-import` (Relevance AI in `server/relevanceLinkedIn.ts`, then HTML fallback).
  */
 export async function importLinkedInProfile(
   linkedInUrl?: string | null
-): Promise<Partial<UserProfile>> {
+): Promise<LinkedInImportResult> {
   const normalized = linkedInUrl ? parseLinkedInProfileUrl(linkedInUrl) : null;
   if (!normalized) return {};
 
@@ -145,8 +151,17 @@ export async function importLinkedInProfile(
   }
 
   if (res.status === 422) {
-    const j = (await res.json()) as { linkedInProfileUrl?: string; error?: string };
-    return { linkedInProfileUrl: j.linkedInProfileUrl || normalized };
+    const j = (await res.json()) as {
+      linkedInProfileUrl?: string;
+      error?: string;
+      relevanceError?: string;
+      authWall?: boolean;
+    };
+    const hint = [j.relevanceError, j.error].filter(Boolean).join(' · ');
+    return {
+      linkedInProfileUrl: j.linkedInProfileUrl || normalized,
+      ...(hint ? { importHint: hint } : {}),
+    };
   }
 
   if (!res.ok) {

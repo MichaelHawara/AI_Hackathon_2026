@@ -1,0 +1,63 @@
+Dataset Integration, Testing Guide, and Improvement Suggestions
+================================================================
+
+A. WHAT WAS INTEGRATED
+----------------------
+1) O*NET-oriented skill clusters (file: src/data/onetSkillClusters.json)
+   - Occupation keyword groups map to skill lists using O*NET Content Model terminology.
+   - Used by src/services/fitScore.ts to compute explainable "application alignment" scores alongside keyword overlap between the student profile and job text.
+
+2) Job market feeds (live)
+   - server/jobsAggregator.ts aggregates Indeed RSS, LinkedIn job RSS, and Google Careers API responses (plus Handshake-flavored samples from mock data). This satisfies "real hiring signals" from public APIs.
+
+3) College Scorecard–style sample (file: src/data/collegeScorecardSample.json)
+   - Referenced in Gemini prompts for the per-job "Role coach" (src/services/gemini.ts) to remind the model that earnings/debt statistics have limits—not for personalized financial advice.
+
+4) Google Gemini (generative AI)
+   - Resume parsing: parseResumeToProfile() structures resume text into profile fields.
+   - Global career chat and per-job Role coach: natural-language assistance with guardrails in prompts.
+
+B. HOW TO VERIFY EACH FEATURE
+-------------------------------
+Prerequisites: Node 18+, npm install, .env.local with VITE_GEMINI_API_KEY (and Firebase keys if using auth). Run: npm run dev → http://localhost:3000
+
+1) Application alignment (%) on Home / Search / Job modal
+   - Sign in and ensure your profile has several skills (Account page).
+   - Open Home: each card shows an alignment percentage; header shows average alignment.
+   - Open any job: modal shows "Application alignment" panel with score, confidence, O*NET cluster line, and "Why this score?"
+   - Expected: Score changes when you add/remove skills or edit experience. With zero skills, messaging should encourage adding skills.
+
+2) Resume → profile autofill
+   - Go to Account → "Resume → profile (AI)".
+   - Upload a PDF resume (text-based PDF works best; scanned images may fail).
+   - Expected: Fields merge into profile; a notice asks you to review before saving. Click Save Changes to persist to Firestore.
+
+3) Per-job Role coach
+   - Open a job modal → expand "Role coach (this job)".
+   - Ask: "What should I learn first for this role?" or "Suggest two free resources."
+   - Expected: A tailored answer referencing the job and your profile. If Gemini errors, check VITE_GEMINI_API_KEY and restart the dev server.
+
+4) API jobs feed
+   - GET http://localhost:3000/api/jobs should return JSON job array when the dev server is running.
+
+C. SUGGESTIONS TO STRENGTHEN THE SYSTEM
+---------------------------------------
+• O*NET Web Services: Integrate the official O*NET API (https://www.onetonline.org/help/onet/webservices) for SOC-based lookups when you obtain API credentials—reduces manual cluster curation.
+
+• College Scorecard API: Add server route with COLLEGE_SCORECARD_API_KEY to fetch real institution metrics by name for students comparing schools.
+
+• Fairness monitoring: Log anonymized alignment score distributions by region or job source; alert if one source systematically scores higher (representation bias).
+
+• Resume parsing: Add human confirmation step (checkbox per imported block) before merge for higher trust.
+
+• Role coach: Cache recent Q&A per job in Firestore to reduce API cost and allow users to resume conversations.
+
+• Accessibility: Ensure PDF upload has visible label (sr-only improved in Account) and keyboard focus order in modals.
+
+D. FILES TO REVIEW FOR INTEGRATION DETAILS
+------------------------------------------
+• src/services/fitScore.ts — scoring logic
+• src/data/onetSkillClusters.json — cluster definitions
+• src/services/gemini.ts — parseResumeToProfile, getJobCoachReply
+• src/components/JobModal.tsx — fit panel + JobCoachChat
+• src/pages/Account.tsx — resume upload handler

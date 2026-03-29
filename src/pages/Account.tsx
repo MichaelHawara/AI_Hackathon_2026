@@ -1,5 +1,5 @@
 import { useState, useEffect, useId } from 'react';
-import { User, Mail, Phone, MapPin, Calendar, Award, BookOpen, Settings, Save, Linkedin, X, LogOut, Code, FlaskConical, Heart, Star, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Award, BookOpen, Settings, Save, Linkedin, X, LogOut, Code, FlaskConical, Heart, Star, Loader2, FileUp } from 'lucide-react';
 import { db, auth, doc, getDoc, updateDoc, signOut } from '../firebase';
 import { UserProfile, Experience, Education, Project, ResearchPaper, VolunteerExperience, Certification } from '../types';
 import {
@@ -8,6 +8,8 @@ import {
   PrivateLinkedInProfileError
 } from '../services/linkedin';
 import EditableSection from '../components/EditableSection';
+import { extractTextFromPdfFile } from '../utils/extractPdfText';
+import { parseResumeToProfile, formatGeminiError } from '../services/gemini';
 
 const inputClass = 'w-full p-2 border border-stone-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500';
 const labelClass = 'text-xs font-bold text-stone-600 block mb-1';
@@ -34,8 +36,11 @@ export default function Account() {
   const [saving, setSaving] = useState(false);
   const [linkedInLoading, setLinkedInLoading] = useState(false);
   const [linkedInNotice, setLinkedInNotice] = useState<{
-    kind: 'ok-api' | 'scraped' | 'saved-url' | 'private';
+    kind: 'ok-api' | 'scraped' | 'saved-url' | 'private' | 'relevance-failed';
+    detail?: string;
   } | null>(null);
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [resumeNotice, setResumeNotice] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState<string | null>(null);
 
   const [newExperience, setNewExperience] = useState<Experience>({
@@ -112,6 +117,65 @@ export default function Account() {
     }
   };
 
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !profile) return;
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please upload a PDF resume.');
+      return;
+    }
+    setResumeLoading(true);
+    setResumeNotice(null);
+    try {
+      const text = await extractTextFromPdfFile(file);
+      if (!text || text.length < 40) {
+        alert('Could not read enough text from this PDF. Try another file or paste your resume into a new PDF.');
+        setResumeLoading(false);
+        return;
+      }
+      const parsed = await parseResumeToProfile(text);
+      const mergeExp = (parsed.experience ?? []).map((ex) => ({
+        ...ex,
+        id: ex.id || newId()
+      }));
+      const mergeEdu = (parsed.education ?? []).map((ed) => ({
+        ...ed,
+        id: ed.id || newId()
+      }));
+      const mergeProj = (parsed.projects ?? []).map((p) => ({
+        ...p,
+        id: p.id || newId(),
+        technologies: p.technologies ?? []
+      }));
+      const mergeCert = (parsed.certifications ?? []).map((c) => ({
+        ...c,
+        id: c.id || newId()
+      }));
+      setProfile({
+        ...profile,
+        fullName: parsed.fullName?.trim() || profile.fullName,
+        phone: parsed.phone?.trim() || profile.phone,
+        address: parsed.address?.trim() || profile.address,
+        skills:
+          parsed.skills?.length && (parsed.skills?.length ?? 0) > 0
+            ? [...new Set([...(profile.skills ?? []), ...parsed.skills!])]
+            : profile.skills,
+        experience: mergeExp.length ? [...(profile.experience ?? []), ...mergeExp] : profile.experience,
+        education: mergeEdu.length ? [...(profile.education ?? []), ...mergeEdu] : profile.education,
+        projects: mergeProj.length ? [...(profile.projects ?? []), ...mergeProj] : profile.projects,
+        certifications: mergeCert.length ? [...(profile.certifications ?? []), ...mergeCert] : profile.certifications
+      });
+      setResumeNotice(
+        'Resume parsed with AI — review all fields for accuracy before saving. We never invent data intentionally, but models can misread formatting.'
+      );
+    } catch (err) {
+      alert(`Resume import failed: ${formatGeminiError(err)}`);
+    } finally {
+      setResumeLoading(false);
+    }
+  };
+
   const handleLinkedInImport = async () => {
     if (!profile) return;
     const url = profile.linkedInProfileUrl?.trim();
@@ -123,32 +187,40 @@ export default function Account() {
     setLinkedInNotice(null);
     try {
       const imported = await importLinkedInProfile(url || undefined);
+      const { importHint, ...importedRest } = imported;
       setProfile({
         ...profile,
-        ...imported,
-        experience: imported.experience?.length ? imported.experience : profile.experience,
-        education: imported.education?.length ? imported.education : profile.education,
-        projects: imported.projects?.length ? imported.projects : profile.projects,
-        researchPapers: imported.researchPapers?.length ? imported.researchPapers : profile.researchPapers,
-        volunteerExperience: imported.volunteerExperience?.length
-          ? imported.volunteerExperience
+        ...importedRest,
+        experience: importedRest.experience?.length ? importedRest.experience : profile.experience,
+        education: importedRest.education?.length ? importedRest.education : profile.education,
+        projects: importedRest.projects?.length ? importedRest.projects : profile.projects,
+        researchPapers: importedRest.researchPapers?.length ? importedRest.researchPapers : profile.researchPapers,
+        volunteerExperience: importedRest.volunteerExperience?.length
+          ? importedRest.volunteerExperience
           : profile.volunteerExperience,
-        certifications: imported.certifications?.length ? imported.certifications : profile.certifications,
-        skills: imported.skills?.length ? imported.skills : profile.skills,
-        linkedInProfileUrl: imported.linkedInProfileUrl || profile.linkedInProfileUrl
+        certifications: importedRest.certifications?.length ? importedRest.certifications : profile.certifications,
+        skills: importedRest.skills?.length ? importedRest.skills : profile.skills,
+        linkedInProfileUrl: importedRest.linkedInProfileUrl || profile.linkedInProfileUrl
       });
       const enriched = !!(
-        imported.experience?.length ||
-        imported.skills?.length ||
-        imported.fullName
+        importedRest.experience?.length ||
+        importedRest.skills?.length ||
+        importedRest.fullName
       );
-      setLinkedInNotice(
-        import.meta.env.VITE_LINKEDIN_IMPORT_API?.trim()
-          ? { kind: 'ok-api' }
-          : enriched
-            ? { kind: 'scraped' }
-            : { kind: 'saved-url' }
-      );
+      if (importHint) {
+        setLinkedInNotice({
+          kind: 'relevance-failed',
+          detail: importHint,
+        });
+      } else {
+        setLinkedInNotice(
+          import.meta.env.VITE_LINKEDIN_IMPORT_API?.trim()
+            ? { kind: 'ok-api' }
+            : enriched
+              ? { kind: 'scraped' }
+              : { kind: 'saved-url' }
+        );
+      }
     } catch (e) {
       if (e instanceof PrivateLinkedInProfileError) {
         setLinkedInNotice({ kind: 'private' });
@@ -309,7 +381,9 @@ export default function Account() {
                       ? 'bg-sky-50 border-sky-200 text-sky-950'
                       : linkedInNotice.kind === 'private'
                         ? 'bg-amber-50 border-amber-200 text-amber-950'
-                        : 'bg-stone-50 border-stone-200 text-stone-700'
+                        : linkedInNotice.kind === 'relevance-failed'
+                          ? 'bg-rose-50 border-rose-200 text-rose-950'
+                          : 'bg-stone-50 border-stone-200 text-stone-700'
                 }`}
               >
                 <div className="flex justify-between gap-2">
@@ -320,7 +394,9 @@ export default function Account() {
                         ? 'Imported public fields from your LinkedIn page via the dev server (metadata may be partial). Review and edit below.'
                         : linkedInNotice.kind === 'private'
                           ? 'Your LinkedIn profile looks private or not visible to our import tool. Set your profile to public (or use a public profile URL) and try again.'
-                          : 'Your LinkedIn URL is saved. If import was empty, LinkedIn may have blocked automated access—add experience and skills manually, or set VITE_LINKEDIN_IMPORT_API.'}
+                          : linkedInNotice.kind === 'relevance-failed'
+                            ? `Relevance AI or scrape step did not return usable profile data. ${linkedInNotice.detail ?? ''} Set RELEVANCEAI_WEBHOOK_URL and RELEVANCEAI_API_KEY in .env.local to your Relevance studio (see .env.example), restart the server, and ensure your tool returns JSON with name/experience/skills.`
+                            : 'Your LinkedIn URL is saved. If import was empty, LinkedIn may have blocked automated access—add experience and skills manually, or set VITE_LINKEDIN_IMPORT_API.'}
                   </p>
                   <button
                     type="button"
@@ -337,6 +413,36 @@ export default function Account() {
               Paste your public profile URL. Optional: point VITE_LINKEDIN_IMPORT_API at a server that returns profile JSON.
             </p>
           </div>
+
+          <div className="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm text-left">
+            <h3 className="font-bold text-stone-900 text-sm uppercase tracking-widest mb-3 flex items-center gap-2">
+              <FileUp size={16} aria-hidden />
+              Resume → profile (AI)
+            </h3>
+            <p className="text-xs text-stone-500 mb-3 leading-snug">
+              Upload a PDF resume. We extract text in your browser, then Gemini structures it into your profile. Review and edit before saving.
+            </p>
+            <label className="flex flex-col gap-2">
+              <span className="sr-only">Upload resume PDF</span>
+              <input
+                type="file"
+                accept="application/pdf"
+                disabled={resumeLoading}
+                onChange={(ev) => void handleResumeUpload(ev)}
+                className="text-xs text-stone-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:text-white file:font-bold hover:file:bg-emerald-700"
+              />
+            </label>
+            {resumeLoading && (
+              <p className="text-xs text-emerald-700 font-bold mt-2 flex items-center gap-2">
+                <Loader2 className="animate-spin" size={14} aria-hidden />
+                Parsing resume…
+              </p>
+            )}
+            {resumeNotice && (
+              <p className="text-xs text-stone-600 mt-2 p-2 rounded-lg bg-emerald-50 border border-emerald-100">{resumeNotice}</p>
+            )}
+          </div>
+
           <div className="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm space-y-4">
             <h3 className="font-bold text-stone-900 text-sm uppercase tracking-widest">Contact Info</h3>
             <div className="space-y-3">

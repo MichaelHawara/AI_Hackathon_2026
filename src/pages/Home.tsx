@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MapPin, DollarSign, Clock, Bookmark, BookmarkCheck, Briefcase, Sparkles, TrendingUp } from 'lucide-react';
@@ -7,6 +7,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { Job, UserProfile } from '../types';
 import JobModal from '../components/JobModal';
 import { mockJobs } from '../data/mockJobs';
+import { computeApplicationFit } from '../services/fitScore';
+import { BRAND_LOGO_TRANSPARENT } from '../branding';
 
 export default function Home() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -62,6 +64,15 @@ export default function Home() {
       if (unsubscribeJobs) unsubscribeJobs();
     };
   }, []);
+
+  const avgAlignment = useMemo(() => {
+    if (!userProfile?.skills?.length || jobs.length === 0) return null;
+    let sum = 0;
+    for (const j of jobs) {
+      sum += computeApplicationFit(j, userProfile).score;
+    }
+    return Math.round(sum / jobs.length);
+  }, [jobs, userProfile]);
 
   useEffect(() => {
     const jid = searchParams.get('jobId');
@@ -121,6 +132,13 @@ export default function Home() {
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="space-y-4">
+            <img
+              src={BRAND_LOGO_TRANSPARENT}
+              alt=""
+              className="h-8 w-auto max-w-[220px] object-contain object-left opacity-90"
+              width={220}
+              height={32}
+            />
             <div className="inline-flex items-center space-x-2 bg-emerald-500/20 border border-emerald-500/30 px-3 py-1 rounded-full">
               <Sparkles size={14} className="text-emerald-400" />
               <span className="text-emerald-400 text-[10px] font-black uppercase tracking-widest">Personalized Feed</span>
@@ -131,17 +149,26 @@ export default function Home() {
                 {userProfile?.fullName?.split(' ')[0] || 'Future Leader'}
               </span>
             </h1>
-            <p className="text-stone-400 max-w-md">We've found 12 new opportunities that match your profile today.</p>
+            <p className="text-stone-400 max-w-md">
+              {jobs.length > 0
+                ? `Exploration → preparation → applications: ${jobs.length} opportunities in your feed (real postings + student-oriented fit scores).`
+                : 'Loading your feed…'}
+            </p>
           </div>
           
           <div className="flex items-center space-x-4">
             <div className="bg-white/5 backdrop-blur-md border border-white/10 p-6 rounded-3xl text-center">
-              <div className="text-emerald-400 font-black text-2xl mb-1">85%</div>
-              <div className="text-stone-500 text-[10px] uppercase font-bold tracking-widest">Profile Match</div>
+              <div className="text-emerald-400 font-black text-2xl mb-1">
+                {avgAlignment !== null ? `${avgAlignment}%` : '—'}
+              </div>
+              <div className="text-stone-500 text-[10px] uppercase font-bold tracking-widest">Avg. alignment</div>
+              <div className="text-stone-600 text-[9px] mt-1 max-w-[140px] mx-auto leading-tight">
+                {userProfile?.skills?.length ? 'O*NET-informed estimate' : 'Add skills in Account'}
+              </div>
             </div>
             <div className="bg-white/5 backdrop-blur-md border border-white/10 p-6 rounded-3xl text-center">
-              <div className="text-indigo-400 font-black text-2xl mb-1">12</div>
-              <div className="text-stone-500 text-[10px] uppercase font-bold tracking-widest">New Jobs</div>
+              <div className="text-indigo-400 font-black text-2xl mb-1">{loading ? '…' : jobs.length}</div>
+              <div className="text-stone-500 text-[10px] uppercase font-bold tracking-widest">Jobs in feed</div>
             </div>
           </div>
         </div>
@@ -190,7 +217,17 @@ export default function Home() {
                     </button>
                   </div>
 
-                  <h3 className="font-black text-xl text-stone-900 mb-1 leading-tight group-hover:text-emerald-600 transition-colors">{job.title}</h3>
+                  <div className="flex justify-between items-start gap-2 mb-1">
+                    <h3 className="font-black text-xl text-stone-900 leading-tight group-hover:text-emerald-600 transition-colors">{job.title}</h3>
+                    {userProfile && (
+                      <span
+                        className="shrink-0 text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-indigo-100 text-indigo-800 border border-indigo-200"
+                        title="Transparent alignment score — not a hiring guarantee"
+                      >
+                        {computeApplicationFit(job, userProfile).score}%
+                      </span>
+                    )}
+                  </div>
                   <p className="text-stone-400 font-bold text-sm mb-6">{job.company}</p>
 
                   <div className="space-y-3 mb-8">
