@@ -325,21 +325,17 @@ documents/{docId}
 
 ## Deployment
 
-`npm run build` produces a static `dist/` folder. **Firebase Hosting** and **Vercel** typically serve that folder as a static site. Your **Express API** (`server/`) is separate: if you need `/api/*` in production, run Node (or another host) for the server and point the frontend’s API base URL accordingly, or deploy backend and frontend as separate services.
-
-### Firebase Hosting (static frontend)
+Production uses **one Node process**: after `npm run build`, `npm start` runs Express with `NODE_ENV=production`, serving the SPA from `dist/` and `/api/*` on the same origin (see [`server/index.ts`](server/index.ts)).
 
 ```bash
+npm install
 npm run build
-firebase deploy
+npm start
 ```
 
-### Vercel (static frontend)
+**Never deployed before?** Follow **[docs/HOSTING.md](docs/HOSTING.md)** from the top (GitHub → Render → env vars → Firebase). Same file also has the short checklist (env vars, `PORT`, SEO).
 
-```bash
-npm run build
-vercel --prod
-```
+If you split frontend and backend across separate hosts, you must configure API base URLs and CORS yourself; the default app assumes a single origin.
 
 ## Architecture Diagram
 
