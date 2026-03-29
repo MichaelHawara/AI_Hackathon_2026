@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 interface EditableSectionProps {
   title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
+  icon: ReactNode;
+  children: ReactNode;
   onAdd: () => void;
 }
 

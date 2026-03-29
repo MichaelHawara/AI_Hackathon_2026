@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Briefcase, Bookmark, CheckCircle, Clock, Trash2, ExternalLink, X, FileText, FileCode, FileDown, Eye } from 'lucide-react';
 import Markdown from 'react-markdown';
-import { db, auth, collection, onSnapshot, deleteDoc, doc, getDoc } from '../firebase';
+import { db, auth, collection, onSnapshot, deleteDoc, doc, getDocs, query, where } from '../firebase';
 import { Job, UserProfile } from '../types';
 import JobModal from '../components/JobModal';
 import { downloadUserContentAsPdf } from '../utils/documentDownload';
@@ -49,12 +49,10 @@ export default function MyJobs() {
     if (!auth.currentUser) return;
     try {
       const docsRef = collection(db, 'users', auth.currentUser.uid, 'documents');
-      const unsubscribe = onSnapshot(docsRef, (snapshot) => {
-        const docs = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter((doc: any) => doc.jobId === jobId);
-        setSelectedJobDocuments(docs);
-      });
+      const q = query(docsRef, where('jobId', '==', jobId));
+      const snapshot = await getDocs(q);
+      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setSelectedJobDocuments(docs);
     } catch (error) {
       console.error("Failed to fetch documents", error);
     }

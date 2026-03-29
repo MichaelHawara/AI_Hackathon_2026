@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search as SearchIcon, MapPin, DollarSign, Clock, ExternalLink, Bookmark, BookmarkCheck, Briefcase, Sparkles, TrendingUp } from 'lucide-react';
+import { MapPin, DollarSign, Clock, Bookmark, BookmarkCheck, Briefcase, Sparkles, TrendingUp } from 'lucide-react';
 import { db, auth, collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp, getDoc } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Job, UserProfile } from '../types';
@@ -17,8 +17,26 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    setJobs(mockJobs);
-    setLoading(false);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/jobs');
+        if (res.ok) {
+          const remote = (await res.json()) as Job[];
+          if (!cancelled && Array.isArray(remote) && remote.length > 0) {
+            setJobs(remote);
+          } else if (!cancelled) {
+            setJobs(mockJobs);
+          }
+        } else if (!cancelled) {
+          setJobs(mockJobs);
+        }
+      } catch {
+        if (!cancelled) setJobs(mockJobs);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
 
     let unsubscribeJobs: () => void;
 
@@ -39,6 +57,7 @@ export default function Home() {
     });
 
     return () => {
+      cancelled = true;
       unsubscribeAuth();
       if (unsubscribeJobs) unsubscribeJobs();
     };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MapPin, DollarSign, Clock, ExternalLink, FileText, FileCode, Sparkles, Loader2, Bookmark, BookmarkCheck, Eye, CheckCircle, FileDown } from 'lucide-react';
 import Markdown from 'react-markdown';

@@ -1,8 +1,12 @@
-import React, { useState, useEffect, useId } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { User, Mail, Phone, MapPin, Calendar, Award, BookOpen, Settings, Save, Linkedin, X, LogOut, Code, FlaskConical, Heart, Star, Loader2 } from 'lucide-react';
 import { db, auth, doc, getDoc, updateDoc, signOut } from '../firebase';
 import { UserProfile, Experience, Education, Project, ResearchPaper, VolunteerExperience, Certification } from '../types';
-import { importLinkedInProfile, parseLinkedInProfileUrl } from '../services/linkedin';
+import {
+  importLinkedInProfile,
+  parseLinkedInProfileUrl,
+  PrivateLinkedInProfileError
+} from '../services/linkedin';
 import EditableSection from '../components/EditableSection';
 
 const inputClass = 'w-full p-2 border border-stone-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500';
@@ -30,7 +34,7 @@ export default function Account() {
   const [saving, setSaving] = useState(false);
   const [linkedInLoading, setLinkedInLoading] = useState(false);
   const [linkedInNotice, setLinkedInNotice] = useState<{
-    kind: 'ok-api' | 'scraped' | 'saved-url';
+    kind: 'ok-api' | 'scraped' | 'saved-url' | 'private';
   } | null>(null);
   const [showAdd, setShowAdd] = useState<string | null>(null);
 
@@ -145,8 +149,13 @@ export default function Account() {
             ? { kind: 'scraped' }
             : { kind: 'saved-url' }
       );
-    } catch {
-      alert('Import failed. Try again.');
+    } catch (e) {
+      if (e instanceof PrivateLinkedInProfileError) {
+        setLinkedInNotice({ kind: 'private' });
+        return;
+      }
+      const msg = e instanceof Error && e.message ? e.message : 'Import failed. Try again.';
+      alert(msg);
     } finally {
       setLinkedInLoading(false);
     }
@@ -298,7 +307,9 @@ export default function Account() {
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
                     : linkedInNotice.kind === 'scraped'
                       ? 'bg-sky-50 border-sky-200 text-sky-950'
-                      : 'bg-stone-50 border-stone-200 text-stone-700'
+                      : linkedInNotice.kind === 'private'
+                        ? 'bg-amber-50 border-amber-200 text-amber-950'
+                        : 'bg-stone-50 border-stone-200 text-stone-700'
                 }`}
               >
                 <div className="flex justify-between gap-2">
@@ -307,7 +318,9 @@ export default function Account() {
                       ? 'Profile fields were updated from your import API.'
                       : linkedInNotice.kind === 'scraped'
                         ? 'Imported public fields from your LinkedIn page via the dev server (metadata may be partial). Review and edit below.'
-                        : 'Your LinkedIn URL is saved. If import was empty, LinkedIn may have blocked automated access—add experience and skills manually, or set VITE_LINKEDIN_IMPORT_API.'}
+                        : linkedInNotice.kind === 'private'
+                          ? 'Your LinkedIn profile looks private or not visible to our import tool. Set your profile to public (or use a public profile URL) and try again.'
+                          : 'Your LinkedIn URL is saved. If import was empty, LinkedIn may have blocked automated access—add experience and skills manually, or set VITE_LINKEDIN_IMPORT_API.'}
                   </p>
                   <button
                     type="button"

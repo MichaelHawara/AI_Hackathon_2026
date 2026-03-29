@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   GraduationCap,
@@ -25,7 +25,11 @@ import {
   signInWithEmailAndPassword
 } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import { importLinkedInProfile, parseLinkedInProfileUrl } from '../services/linkedin';
+import {
+  importLinkedInProfile,
+  parseLinkedInProfileUrl,
+  PrivateLinkedInProfileError
+} from '../services/linkedin';
 import type {
   Experience,
   Education,
@@ -63,7 +67,7 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(false);
   const [linkedInLoading, setLinkedInLoading] = useState(false);
   const [linkedInNotice, setLinkedInNotice] = useState<{
-    kind: 'ok-api' | 'scraped' | 'saved-url';
+    kind: 'ok-api' | 'scraped' | 'saved-url' | 'private';
   } | null>(null);
   const [skillDraft, setSkillDraft] = useState('');
 
@@ -226,7 +230,12 @@ export default function Onboarding() {
             ? { kind: 'scraped' }
             : { kind: 'saved-url' }
       );
-    } catch {
+    } catch (e) {
+      if (e instanceof PrivateLinkedInProfileError) {
+        setLinkedInNotice({ kind: 'private' });
+        setError('');
+        return;
+      }
       setError('Could not import LinkedIn data. Try again or skip.');
     } finally {
       setLinkedInLoading(false);
@@ -380,14 +389,18 @@ export default function Onboarding() {
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
                   : linkedInNotice.kind === 'scraped'
                     ? 'bg-sky-50 border-sky-200 text-sky-950'
-                    : 'bg-stone-50 border-stone-200 text-stone-700'
+                    : linkedInNotice.kind === 'private'
+                      ? 'bg-amber-50 border-amber-200 text-amber-950'
+                      : 'bg-stone-50 border-stone-200 text-stone-700'
               }`}
             >
               {linkedInNotice.kind === 'ok-api'
                 ? 'Profile fields were updated from your import API. You can edit everything below.'
                 : linkedInNotice.kind === 'scraped'
                   ? 'Imported public fields from your LinkedIn page (server scrape). Review and edit below.'
-                  : 'Your LinkedIn URL is saved. If nothing imported, LinkedIn may have blocked access—add experience and skills below.'}
+                  : linkedInNotice.kind === 'private'
+                    ? 'This profile looks private or not visible to our import. Set it to public and try again, or add experience manually.'
+                    : 'Your LinkedIn URL is saved. If nothing imported, LinkedIn may have blocked access—add experience and skills below.'}
             </div>
           )}
 

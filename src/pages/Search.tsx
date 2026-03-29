@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search as SearchIcon, Filter,MapPin, Briefcase, ChevronRight, DollarSign, Clock, Sparkles, X } from 'lucide-react';
 import { Job, UserProfile } from '../types';
-import { db, auth, doc, getDoc, collection, onSnapshot } from '../firebase';
+import { db, auth, doc, getDoc } from '../firebase';
 import JobModal from '../components/JobModal';
+import { mockJobs } from '../data/mockJobs';
 
 export default function Search() {
   const [searchTerm, setSearchTerm] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     source: [] as string[],
@@ -32,16 +32,21 @@ export default function Search() {
     };
     fetchProfile();
 
-    // Mock jobs
-    const mockJobs: Job[] = [
-      { id: '1', title: 'Software Engineering Intern', company: 'Google', location: 'Mountain View, CA', description: 'Work on large-scale distributed systems...', source: 'Handshake', pay: '$45/hr', postedDate: new Date().toISOString(), workType: 'Hybrid', requirements: ['Java', 'Python', 'C++'] },
-      { id: '2', title: 'Product Management Associate', company: 'Meta', location: 'Remote', description: 'Shape the future of social connection...', source: 'LinkedIn', pay: '$120k/yr', postedDate: new Date().toISOString(), workType: 'Remote', requirements: ['Product Strategy', 'Analytics'] },
-      { id: '3', title: 'Data Science Fellow', company: 'NVIDIA', location: 'Santa Clara, CA', description: 'Apply machine learning techniques...', source: 'Indeed', pay: '$55/hr', postedDate: new Date().toISOString(), workType: 'In-person', requirements: ['Python', 'Machine Learning'] },
-      { id: '4', title: 'UX Research Intern', company: 'Airbnb', location: 'San Francisco, CA', description: 'Help define the future of travel...', source: 'Handshake', pay: '$40/hr', postedDate: new Date().toISOString(), workType: 'Hybrid', requirements: ['User Research', 'Figma'] },
-      { id: '5', title: 'Backend Developer', company: 'Stripe', location: 'Remote', description: 'Build the infrastructure of the internet economy...', source: 'LinkedIn', pay: '$150k/yr', postedDate: new Date().toISOString(), workType: 'Remote', requirements: ['Node.js', 'PostgreSQL'] },
-    ];
-    setJobs(mockJobs);
-    setLoading(false);
+    (async () => {
+      try {
+        const res = await fetch('/api/jobs');
+        if (res.ok) {
+          const remote = (await res.json()) as Job[];
+          if (Array.isArray(remote) && remote.length > 0) {
+            setJobs(remote);
+            return;
+          }
+        }
+      } catch {
+        /* use fallback */
+      }
+      setJobs(mockJobs.slice(0, 15));
+    })();
   }, []);
 
   const filteredJobs = jobs.filter(job => {
@@ -129,7 +134,7 @@ export default function Search() {
               <div className="space-y-3">
                 <label className="font-bold text-sm text-stone-900 uppercase tracking-widest">Source</label>
                 <div className="space-y-2">
-                  {['Handshake', 'LinkedIn', 'Indeed'].map(source => (
+                  {['Handshake', 'LinkedIn', 'Indeed', 'Google'].map(source => (
                     <label key={source} className="flex items-center space-x-2 cursor-pointer">
                       <input
                         type="checkbox"

@@ -5,7 +5,15 @@ const rid = () =>
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-/** Demo data used when no backend LinkedIn import is configured. */
+/** Thrown when Relevance AI / server detects a private or non-public LinkedIn profile. */
+export class PrivateLinkedInProfileError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PrivateLinkedInProfileError';
+  }
+}
+
+/** Demo data for tests only. */
 export function importLinkedInData(): Partial<UserProfile> {
   return {
     experience: [
@@ -77,14 +85,12 @@ export function parseLinkedInProfileUrl(input: string): string | null {
     const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
     const u = new URL(withScheme);
     const host = u.hostname.toLowerCase().replace(/^www\./, '');
-    // LinkedIn uses regional hosts (e.g. uk.linkedin.com, br.linkedin.com) and www.linkedin.com
     const isLinkedIn =
       host === 'linkedin.com' || host.endsWith('.linkedin.com');
     if (!isLinkedIn) return null;
     if (!u.pathname.includes('/in/')) return null;
     u.hash = '';
     u.search = '';
-    // Normalize to www host for storage consistency
     u.hostname = 'www.linkedin.com';
     return u.toString().replace(/\/$/, '');
   } catch {
@@ -92,69 +98,19 @@ export function parseLinkedInProfileUrl(input: string): string | null {
   }
 }
 
-type ScrapePayload = {
-  fullName?: string;
-  headline?: string;
-  about?: string;
-  experience?: Array<{
-    id: string;
-    company: string;
-    role: string;
-    startDate: string;
-    endDate: string;
-    description: string;
-  }>;
-  skills?: string[];
-  error?: string;
-};
-
-function mapScrapeToProfile(data: ScrapePayload, normalized: string): Partial<UserProfile> {
-  const next: Partial<UserProfile> = { linkedInProfileUrl: normalized };
-  if (data.fullName?.trim()) next.fullName = data.fullName.trim();
-  if (data.experience?.length) {
-    next.experience = data.experience.map((e) => ({
-      ...e,
-      id: e.id || rid()
-    }));
-  }
-  if (data.skills?.length) {
-    next.skills = data.skills;
-  }
-  return next;
-}
-
-async function fetchServerScrape(normalized: string): Promise<Partial<UserProfile> | null> {
-  try {
-    const res = await fetch('/api/linkedin-scrape', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profileUrl: normalized })
-    });
-    const data = (await res.json()) as ScrapePayload;
-    if (!res.ok || data.error) {
-      return null;
-    }
-    const mapped = mapScrapeToProfile(data, normalized);
-    if (mapped.fullName || mapped.experience?.length || mapped.skills?.length) {
-      return mapped;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Imports profile-shaped data: optional `VITE_LINKEDIN_IMPORT_API`, then dev-server
- * `POST /api/linkedin-scrape` (HTML metadata / embedded JSON). LinkedIn may block or login-wall requests.
+ * Imports profile data: optional legacy `VITE_LINKEDIN_IMPORT_API`, then
+ * `POST /api/linkedin-import` (Relevance AI + HTML fallback on the server).
  */
 export async function importLinkedInProfile(
   linkedInUrl?: string | null
 ): Promise<Partial<UserProfile>> {
   const normalized = linkedInUrl ? parseLinkedInProfileUrl(linkedInUrl) : null;
+  if (!normalized) return {};
+
   const importEndpoint = (import.meta.env.VITE_LINKEDIN_IMPORT_API as string | undefined)?.trim();
 
-  if (importEndpoint && normalized) {
+  if (importEndpoint) {
     try {
       const res = await fetch(importEndpoint, {
         method: 'POST',
@@ -174,12 +130,29 @@ export async function importLinkedInProfile(
     }
   }
 
-  if (normalized) {
-    const scraped = await fetchServerScrape(normalized);
-    if (scraped) {
-      return scraped;
-    }
-    return { linkedInProfileUrl: normalized };
+  const res = await fetch('/api/linkedin-import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profileUrl: normalized })
+  });
+
+  if (res.status === 403) {
+    const j = (await res.json()) as { error?: string };
+    throw new PrivateLinkedInProfileError(
+      j.error ||
+        'This LinkedIn profile appears to be private or not visible to import tools.'
+    );
   }
-  return {};
+
+  if (res.status === 422) {
+    const j = (await res.json()) as { linkedInProfileUrl?: string; error?: string };
+    return { linkedInProfileUrl: j.linkedInProfileUrl || normalized };
+  }
+
+  if (!res.ok) {
+    const j = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(j.error || `Import failed (${res.status})`);
+  }
+
+  return (await res.json()) as Partial<UserProfile>;
 }

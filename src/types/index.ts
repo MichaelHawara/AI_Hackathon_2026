@@ -86,7 +86,7 @@ export interface Job {
   company: string;
   location: string;
   description: string;
-  source: 'Handshake' | 'LinkedIn' | 'Indeed';
+  source: 'Handshake' | 'LinkedIn' | 'Indeed' | 'Google';
   pay?: string;
   postedDate: string;
   workType?: 'In-person' | 'Remote' | 'Hybrid';
@@ -109,6 +109,8 @@ export interface UserDocument {
   name: string;
   content: string;
   createdAt: string;
+  /** Original filename when uploaded from PDF */
+  sourceFileName?: string;
   jobId?: string;
   jobTitle?: string;
   jobCompany?: string;

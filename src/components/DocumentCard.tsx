@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { FileCode, FileType, FileDown, Trash2, FileText } from 'lucide-react';
 import { UserDocument } from '../types';
@@ -42,6 +41,9 @@ export default function DocumentCard({ doc, onDelete }: DocumentCardProps) {
           <h3 className="font-bold text-stone-900 capitalize">{doc.name || doc.type.replace('-', ' ')}</h3>
           <p className="text-xs text-stone-400">
             Created on {format(new Date(doc.createdAt), 'MMM d, yyyy')}
+            {doc.sourceFileName && (
+              <span className="block text-stone-500 mt-0.5">PDF: {doc.sourceFileName}</span>
+            )}
           </p>
         </div>
       </div>

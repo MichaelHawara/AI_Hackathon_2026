@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, X, Minimize2, Maximize2, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCareerAdvice, formatGeminiError } from '../services/gemini';
