@@ -57,3 +57,15 @@ Many students face opaque job markets and anxiety about "whether they are good e
 • Role coach answers emphasize learning resources and skill-building.
 • Resume upload lowers friction for first-time profile completion.
 • Earnings/debt context is framed cautiously (well-being and satisfaction are not captured by salary alone).
+
+8. IMPLEMENTATION CHECKLIST (vs. Track A prompt)
+------------------------------------------------
+Required / strong fit:
+[ ] Real-world data: live job feeds + O*NET-style clusters + (optional) College Scorecard themes — see DATASET_INTEGRATION_AND_TESTING.txt
+[ ] Bias & fairness: identified in UI copy + fit disclaimers + "Why this score?" — expand if judges ask for subgroup monitoring (DEVOPS_AND_MONITORING.md)
+[ ] Dev + Ops: monitoring / drift / feedback narrative in DEVOPS_AND_MONITORING.md
+[ ] AI/ML for workforce uncertainty: Gemini job-query personalization (POST /api/jobs/personalized), explainable alignment scores (fitScore.ts), Role coach, resume parsing
+
+Nice-to-have for demos:
+[ ] Screen recording of alignment % varying when profile skills change
+[ ] Short README or slide citing O*NET + Adzuna + Gemini usage limits

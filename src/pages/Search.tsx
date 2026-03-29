@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search as SearchIcon, Filter,MapPin, Briefcase, ChevronRight, DollarSign, Clock, Sparkles, X } from 'lucide-react';
 import { Job, UserProfile } from '../types';
 import { db, auth, doc, getDoc } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import JobModal from '../components/JobModal';
-import { mockJobs } from '../data/mockJobs';
 import { computeApplicationFit } from '../services/fitScore';
+import { fetchJobsForUser } from '../services/jobsApi';
 
 export default function Search() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,60 +21,64 @@ export default function Search() {
     maxPay: 200000,
     location: ''
   });
+  const [loadingJobs, setLoadingJobs] = useState(true);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (auth.currentUser) {
-        const docRef = doc(db, 'users', auth.currentUser.uid);
+    let cancelled = false;
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      let profile: UserProfile | null = null;
+      if (user) {
+        const docRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setUserProfile({ uid: auth.currentUser.uid, ...docSnap.data() } as UserProfile);
+          profile = { uid: user.uid, ...docSnap.data() } as UserProfile;
+          setUserProfile(profile);
+        } else {
+          setUserProfile(null);
         }
+      } else {
+        setUserProfile(null);
       }
-    };
-    fetchProfile();
-
-    (async () => {
       try {
-        const res = await fetch('/api/jobs');
-        if (res.ok) {
-          const remote = (await res.json()) as Job[];
-          if (Array.isArray(remote) && remote.length > 0) {
-            setJobs(remote);
-            return;
-          }
-        }
-      } catch {
-        /* use fallback */
+        const list = await fetchJobsForUser(profile);
+        if (!cancelled) setJobs(list);
+      } finally {
+        if (!cancelled) setLoadingJobs(false);
       }
-      setJobs(mockJobs.slice(0, 15));
-    })();
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, []);
 
-  const filteredJobs = jobs.filter(job => {
-    // Search term filter
-    if (searchTerm && !job.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        !job.company.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false;
-    }
+  const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    // Source filter
-    if (filters.source.length > 0 && !filters.source.includes(job.source)) {
-      return false;
-    }
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      if (normalizedSearch) {
+        const hay = `${job.title} ${job.company} ${job.description} ${job.location} ${(job.requirements ?? []).join(' ')}`.toLowerCase();
+        const tokens = normalizedSearch.split(/\s+/).filter(Boolean);
+        const matchesPhrase = hay.includes(normalizedSearch);
+        const matchesAllTokens = tokens.every((t) => hay.includes(t));
+        if (!matchesPhrase && !matchesAllTokens) return false;
+      }
 
-    // Work type filter
-    if (filters.workType.length > 0 && job.workType && !filters.workType.includes(job.workType)) {
-      return false;
-    }
+      if (filters.source.length > 0 && !filters.source.includes(job.source)) {
+        return false;
+      }
 
-    // Location filter
-    if (filters.location && !job.location.toLowerCase().includes(filters.location.toLowerCase())) {
-      return false;
-    }
+      if (filters.workType.length > 0 && job.workType && !filters.workType.includes(job.workType)) {
+        return false;
+      }
 
-    return true;
-  });
+      if (filters.location && !job.location.toLowerCase().includes(filters.location.toLowerCase())) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [jobs, normalizedSearch, filters.source, filters.workType, filters.location]);
 
   return (
     <div className="space-y-10 pb-20">
@@ -83,7 +88,9 @@ export default function Search() {
           <span className="text-indigo-700 text-[10px] font-black uppercase tracking-widest">Global Marketplace</span>
         </div>
         <h1 className="text-4xl font-black text-stone-900 tracking-tight">Discover Opportunities</h1>
-        <p className="text-stone-500 max-w-xl font-medium">Filter through thousands of listings across Handshake, Indeed, and LinkedIn to find your next career milestone.</p>
+        <p className="text-stone-500 max-w-xl font-medium">
+          Search by title, company, description, or location. Listings combine Adzuna and other feeds; your profile shapes personalized results when you’re signed in.
+        </p>
       </header>
 
       <div className="flex flex-col md:flex-row gap-4">
@@ -135,7 +142,7 @@ export default function Search() {
               <div className="space-y-3">
                 <label className="font-bold text-sm text-stone-900 uppercase tracking-widest">Source</label>
                 <div className="space-y-2">
-                  {['Handshake', 'LinkedIn', 'Indeed', 'Google'].map(source => (
+                  {['Handshake', 'LinkedIn', 'Indeed', 'Google', 'Adzuna'].map(source => (
                     <label key={source} className="flex items-center space-x-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -204,6 +211,14 @@ export default function Search() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {loadingJobs && (
+        <p className="text-stone-500 text-sm font-medium px-1">Loading jobs…</p>
+      )}
+
+      {!loadingJobs && filteredJobs.length === 0 && (
+        <p className="text-stone-500 text-sm font-medium px-1">No jobs match your search. Try different keywords or clear filters.</p>
+      )}
 
       <div className="grid grid-cols-1 gap-6">
         {filteredJobs.map((job) => (

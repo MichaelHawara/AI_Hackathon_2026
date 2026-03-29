@@ -196,27 +196,82 @@ Functions:
 - `scrapeToUserProfile` — inline in `server.ts`
 
 
-PART G — JOB LISTINGS (`GET /api/jobs`)
----------------------------------------
-Step 1. The Home / Search pages call `fetch('/api/jobs')` and merge or replace
-mock data depending on response success.
+PART G — JOB LISTINGS (`GET /api/jobs`, `POST /api/jobs/personalized`)
+----------------------------------------------------------------------
+Step 1. Home / Search use `src/services/jobsApi.ts` `fetchJobsForUser(profile)`:
+  signed-in users with profile data → `POST /api/jobs/personalized` (Gemini +
+  heuristics build Adzuna queries); otherwise → `GET /api/jobs`.
 
-Step 2. `server.ts` handles `GET /api/jobs` by calling `aggregateRemoteJobs()`
-in `jobsAggregator.ts`.
+Step 2. `server/index.ts` calls `aggregateRemoteJobs()` (optionally with
+`adzunaWhatQueries` from personalization).
 
 Step 3. `aggregateRemoteJobs` runs in parallel:
-  - `fetchIndeedJobs` — Indeed RSS for a fixed software-intern query (US).
-  - `fetchLinkedInRssJobs` — LinkedIn public jobs RSS for keywords + location.
-  - `fetchGoogleCareersJobs` — `https://careers.google.com/api/v3/search/` JSON.
-  - `handshakeSamples` — a small subset of Handshake-labeled entries from
-    `src/data/mockJobs.ts` (no stable public Handshake RSS in this integration).
+  - `fetchAdzunaJobs` — primary live feed when `ADZUNA_APP_ID` + `ADZUNA_APP_KEY`
+    are set (see `.env.example`).
+  - `fetchIndeedJobs` / `fetchLinkedInRssJobs` — **often return nothing** from a
+    server: Indeed **403**, LinkedIn **404** or TLS drop (HTML error pages, not
+    RSS). See PART H.
+  - `fetchGoogleCareersJobs` — public JSON when available.
+  - `handshakeSamples` — Handshake-labeled rows from `src/data/mockJobs.ts`.
 
-Step 4. Results are merged, deduplicated by `title|company`, and capped (e.g.
-18 items).
+Step 4. Results are merged (Google + Handshake samples before Adzuna so
+deduplication keeps official Google rows when the same job appears twice),
+deduplicated by `title|company`, and capped (`JOBS_AGGREGATE_MAX`).
 
 Functions:
-- `aggregateRemoteJobs`, `fetchIndeedJobs`, `fetchLinkedInRssJobs`,
-  `fetchGoogleCareersJobs`, `handshakeSamples` — `jobsAggregator.ts`
+- `aggregateRemoteJobs`, `fetchAdzunaJobs`, `fetchIndeedJobs`,
+  `fetchLinkedInRssJobs`, `fetchGoogleCareersJobs`, `handshakeSamples` —
+  `jobsAggregator.ts`
+- `resolveAdzunaQueriesForProfile` — `server/jobSearchPersonalization.ts`
+
+
+PART H — FAQ: WHY LINKEDIN “IMPORT” FAILS; WHY NOT JOBS FROM INDEED/LINKEDIN
+----------------------------------------------------------------------------
+Two different features — do not confuse them.
+
+A) LinkedIn **profile import** (paste your `/in/...` URL to fill name, skills,
+   experience in the app)
+
+   • LinkedIn does not offer a public “profile JSON API” for third-party apps
+     the way many APIs do. Server-side **HTML scraping** is blocked (HTTP 999,
+     login walls, private profiles).
+
+   • This app’s supported path is **Relevance AI** (`RELEVANCEAI_*` in
+     `.env.local`): your tool returns structured profile data; see Parts B–F.
+     Use **async** (`trigger_async`) if the tool runs longer than ~30s.
+
+   • If Relevance is misconfigured, the server falls back to `linkedinScrape.ts`,
+     which usually **fails** for the reasons above. Alternatives: **Resume →
+     profile (AI)** on Account, or enter experience manually.
+
+B) **Jobs** from Indeed and LinkedIn (listings in Home / Search)
+
+   • The code tries **public RSS-style URLs** in `jobsAggregator.ts`. From a
+     datacenter or Node `fetch`, Indeed commonly returns **403 Forbidden** and
+     LinkedIn **404** or connection errors — you get HTML, not job XML. That is
+     **expected**; it is not fixed by firewall rules on your PC.
+
+   • **Indeed** and **LinkedIn** job data for production apps normally requires
+     **partner / commercial APIs** (application, compliance, fees). There is
+     no stable “free API key” line in `.env.local` for this repo’s stack.
+
+   • **What to do in this project:** set **Adzuna** keys (`ADZUNA_APP_ID`,
+     `ADZUNA_APP_KEY`) and optionally `ADZUNA_QUERY_WHAT` for non-personalized
+     fallback. Personalized queries use **Gemini** + profile (`POST
+     `/api/jobs/personalized`). Many listings may still originate from major
+     boards but come through Adzuna’s licensed feed, not direct RSS.
+
+   • **Google Careers:** this app does **not** use “SERP” (search-engine result
+     APIs like SerpAPI or Google Programmable Search). It calls Google’s public
+     **`careers.google.com/api/v3/search/`** JSON endpoint (`fetchGoogleCareersJobs`
+     in `jobsAggregator.ts`). That endpoint may return **empty** or fail from some
+     server IPs (similar to RSS). Results are **deduped** by `title|company`; if
+     Adzuna already listed the same Google role, the merge order prefers **Google +
+     Handshake samples before Adzuna** so the `source: "Google"` row is kept when
+     both exist.
+
+   • To integrate **official** Indeed or LinkedIn job APIs later, you would add
+     new server modules under their developer programs — separate from Adzuna.
 
 
 PART I — PDF DOCUMENTS (SEPARATE FROM LINKEDIN)

@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MapPin, DollarSign, Clock, Bookmark, BookmarkCheck, Briefcase, Sparkles, TrendingUp } from 'lucide-react';
 import { db, auth, collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp, getDoc } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Job, UserProfile } from '../types';
 import JobModal from '../components/JobModal';
-import { mockJobs } from '../data/mockJobs';
 import { computeApplicationFit } from '../services/fitScore';
+import { fetchJobsForUser } from '../services/jobsApi';
 import { BRAND_LOGO_TRANSPARENT } from '../branding';
 
 export default function Home() {
@@ -20,53 +20,55 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/jobs');
-        if (res.ok) {
-          const remote = (await res.json()) as Job[];
-          if (!cancelled && Array.isArray(remote) && remote.length > 0) {
-            setJobs(remote);
-          } else if (!cancelled) {
-            setJobs(mockJobs);
-          }
-        } else if (!cancelled) {
-          setJobs(mockJobs);
-        }
-      } catch {
-        if (!cancelled) setJobs(mockJobs);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    let unsubscribeJobs: () => void;
+    let unsubscribeJobs: (() => void) | undefined;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      let profile: UserProfile | null = null;
       if (user) {
         const docRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setUserProfile({ uid: user.uid, ...docSnap.data() } as UserProfile);
+          profile = { uid: user.uid, ...docSnap.data() } as UserProfile;
+          setUserProfile(profile);
+        } else {
+          setUserProfile(null);
         }
-        
+
         const savedJobsRef = collection(db, 'users', user.uid, 'saved_jobs');
+        unsubscribeJobs?.();
         unsubscribeJobs = onSnapshot(savedJobsRef, (snapshot) => {
-          const ids = new Set(snapshot.docs.map(doc => doc.id));
+          const ids = new Set(snapshot.docs.map((d) => d.id));
           setSavedJobIds(ids);
         });
+      } else {
+        setUserProfile(null);
+        setSavedJobIds(new Set());
+        unsubscribeJobs?.();
+        unsubscribeJobs = undefined;
+      }
+
+      try {
+        const list = await fetchJobsForUser(profile);
+        if (!cancelled) setJobs(list);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     });
 
     return () => {
       cancelled = true;
       unsubscribeAuth();
-      if (unsubscribeJobs) unsubscribeJobs();
+      unsubscribeJobs?.();
     };
   }, []);
 
   const avgAlignment = useMemo(() => {
-    if (!userProfile?.skills?.length || jobs.length === 0) return null;
+    if (!userProfile || jobs.length === 0) return null;
+    const hasSignal =
+      (userProfile.skills?.length ?? 0) > 0 ||
+      (userProfile.experience?.length ?? 0) > 0 ||
+      (userProfile.education?.length ?? 0) > 0;
+    if (!hasSignal) return null;
     let sum = 0;
     for (const j of jobs) {
       sum += computeApplicationFit(j, userProfile).score;
@@ -180,7 +182,12 @@ export default function Home() {
             <TrendingUp className="text-emerald-600" size={24} />
             <h2 className="text-2xl font-black text-stone-900 tracking-tight">Recommended for You</h2>
           </div>
-          <button className="text-stone-400 hover:text-stone-900 text-sm font-bold transition-colors">View All</button>
+          <Link
+            to="/search"
+            className="text-stone-400 hover:text-stone-900 text-sm font-bold transition-colors"
+          >
+            View All
+          </Link>
         </div>
 
         {loading ? (

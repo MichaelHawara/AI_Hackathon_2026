@@ -86,7 +86,7 @@ export interface Job {
   company: string;
   location: string;
   description: string;
-  source: 'Handshake' | 'LinkedIn' | 'Indeed' | 'Google';
+  source: 'Handshake' | 'LinkedIn' | 'Indeed' | 'Google' | 'Adzuna';
   pay?: string;
   postedDate: string;
   workType?: 'In-person' | 'Remote' | 'Hybrid';

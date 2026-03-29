@@ -1,6 +1,4 @@
-import dotenv from "dotenv";
-dotenv.config({ path: ".env.local" });
-dotenv.config();
+import "./loadEnv.ts";
 
 import express from "express";
 import http from "http";
@@ -8,7 +6,11 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { scrapeLinkedInProfile, normalizeLinkedInUrl } from "./linkedinScrape.ts";
 import { importLinkedInViaRelevance } from "./relevanceLinkedIn.ts";
-import { aggregateRemoteJobs } from "./jobsAggregator.ts";
+import {
+  aggregateRemoteJobs,
+  getAdzunaFeedDiagnostics,
+} from "./jobsAggregator.ts";
+import { resolveAdzunaQueriesForProfile } from "./jobSearchPersonalization.ts";
 import type { UserProfile } from "../src/types/index.ts";
 
 async function startServer() {
@@ -27,7 +29,7 @@ async function startServer() {
       service: "careerpath-ai",
       datasets: [
         "onet-skill-clusters-v1 (src/data/onetSkillClusters.json)",
-        "live-job-feeds (Indeed RSS, LinkedIn RSS, Google Careers API)",
+        "live-job-feeds (Indeed RSS, LinkedIn RSS, Google Careers API; optional Adzuna JSON API)",
         "college-scorecard-sample (src/data/collegeScorecardSample.json)",
       ],
       docs: ["docs/CHALLENGE_COMPLIANCE.txt", "docs/DATASET_INTEGRATION_AND_TESTING.txt", "docs/DEVOPS_AND_MONITORING.md"],
@@ -41,6 +43,42 @@ async function startServer() {
     } catch (e) {
       res.status(500).json({
         error: e instanceof Error ? e.message : "Failed to load jobs",
+      });
+    }
+  });
+
+  /**
+   * POST body: partial student profile (skills, education, experience, preferences).
+   * Uses Gemini (when GEMINI_API_KEY or VITE_GEMINI_API_KEY is set) to derive Adzuna search queries,
+   * then aggregates jobs with those queries. Falls back to heuristics if the model is unavailable.
+   */
+  app.post("/api/jobs/personalized", async (req, res) => {
+    try {
+      const body = req.body;
+      if (!body || typeof body !== "object") {
+        res.status(400).json({ error: "Expected JSON body with profile fields" });
+        return;
+      }
+      const queries = await resolveAdzunaQueriesForProfile(
+        body as Record<string, unknown>
+      );
+      const jobs = await aggregateRemoteJobs({ adzunaWhatQueries: queries });
+      res.json(jobs);
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "Failed to load personalized jobs",
+      });
+    }
+  });
+
+  /** Dev: verify Adzuna keys load from `.env.local` and see HTTP status + response body preview. */
+  app.get("/api/jobs/feed-status", async (_req, res) => {
+    try {
+      const diag = await getAdzunaFeedDiagnostics();
+      res.json(diag);
+    } catch (e) {
+      res.status(500).json({
+        error: e instanceof Error ? e.message : "feed-status failed",
       });
     }
   });

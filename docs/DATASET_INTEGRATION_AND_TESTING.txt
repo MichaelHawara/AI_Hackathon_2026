@@ -8,7 +8,7 @@ A. WHAT WAS INTEGRATED
    - Used by src/services/fitScore.ts to compute explainable "application alignment" scores alongside keyword overlap between the student profile and job text.
 
 2) Job market feeds (live)
-   - server/jobsAggregator.ts aggregates Indeed RSS, LinkedIn job RSS, and Google Careers API responses (plus Handshake-flavored samples from mock data). This satisfies "real hiring signals" from public APIs.
+   - server/jobsAggregator.ts aggregates Indeed RSS, LinkedIn job RSS, Google Careers API, optional Adzuna JSON API (set ADZUNA_APP_ID + ADZUNA_APP_KEY in .env.local when RSS is blocked with HTTP 403), plus Handshake-flavored samples from mock data. This satisfies "real hiring signals" from public APIs.
 
 3) College Scorecard–style sample (file: src/data/collegeScorecardSample.json)
    - Referenced in Gemini prompts for the per-job "Role coach" (src/services/gemini.ts) to remind the model that earnings/debt statistics have limits—not for personalized financial advice.
@@ -39,6 +39,8 @@ Prerequisites: Node 18+, npm install, .env.local with VITE_GEMINI_API_KEY (and F
 
 4) API jobs feed
    - GET http://localhost:3000/api/jobs should return JSON job array when the dev server is running.
+   - POST http://localhost:3000/api/jobs/personalized with JSON body = student profile (skills, education, experience, preferences) uses Gemini (when `VITE_GEMINI_API_KEY` or `GEMINI_API_KEY` is set) to build Adzuna search queries beyond a single “software engineering” default; then returns aggregated jobs.
+   - If Adzuna keys are set but you still see only Handshake samples: restart `npm run dev` (env is loaded at server start), put keys in project-root `.env.local`, and open GET http://localhost:3000/api/jobs/feed-status — check `probeHttpStatus` (200) and `probeResultCount`. Server logs lines starting with `[jobs] Adzuna` show HTTP errors or empty search results.
 
 C. SUGGESTIONS TO STRENGTHEN THE SYSTEM
 ---------------------------------------

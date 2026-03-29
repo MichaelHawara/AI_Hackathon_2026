@@ -7,6 +7,7 @@ function hostMatchesSource(url: string, source: Job['source']): boolean {
     if (source === 'Indeed') return h.includes('indeed.com');
     if (source === 'Handshake') return h.includes('joinhandshake.com') || h.includes('handshake.com');
     if (source === 'Google') return h.includes('google.com') || h.includes('careers.google.com');
+    if (source === 'Adzuna') return h.includes('adzuna.');
   } catch {
     return false;
   }
@@ -40,6 +41,8 @@ export function getJobApplyUrl(job: Job): string {
       return `https://joinhandshake.com/stu/jobs?q=${q}`;
     case 'Google':
       return `https://careers.google.com/jobs/results/?q=${encodeURIComponent(`${job.title} ${job.company}`)}`;
+    case 'Adzuna':
+      return job.url?.trim() || `https://www.adzuna.com/jobs?q=${q}`;
     default:
       return job.url?.trim() || `https://www.google.com/search?q=${q}`;
   }
