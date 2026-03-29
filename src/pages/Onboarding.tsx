@@ -55,7 +55,6 @@ const newId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-import { useNavigate } from 'react-router-dom';
 
 export default function Onboarding() {
   const navigate = useNavigate();
