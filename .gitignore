@@ -10,3 +10,4 @@ firebase-applet-config.json
 .claude/
 
 .env.local
+.env.example
