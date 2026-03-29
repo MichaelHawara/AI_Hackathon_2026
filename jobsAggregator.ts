@@ -4,6 +4,7 @@
 import { XMLParser } from "fast-xml-parser";
 import type { Job } from "./src/types/index.ts";
 import { mockJobs } from "./src/data/mockJobs.ts";
+import axios from "axios";
 
 function hashId(s: string): string {
   let h = 0;
@@ -171,6 +172,42 @@ export async function fetchGoogleCareersJobs(limit = 3): Promise<Job[]> {
   }
 }
 
+export async function fetchSerpApiJobs(limit = 5): Promise<Job[]> {
+  if (!process.env.SERP_API_KEY) return [];
+
+  try {
+    const res = await axios.get("https://serpapi.com/search.json", {
+      params: {
+        engine: "google_jobs",
+        q: "software engineer intern",
+        hl: "en",
+        api_key: process.env.SERP_API_KEY,
+      },
+    });
+
+    const jobs = res.data.jobs_results || [];
+
+    console.log("Serp jobs:", jobs.length);
+    
+    return jobs.slice(0, limit).map((job: any) => ({
+      id: hashId(`serp-${job.job_id}`),
+      title: job.title,
+      company: job.company_name,
+      location: job.location || "Remote",
+      description: (job.description || "").slice(0, 1200),
+      source: "Google Jobs",
+      postedDate: new Date().toISOString(),
+      workType: "Remote",
+      requirements: [],
+      url: job.related_links?.[0]?.link || "",
+      pay: job.detected_extensions?.salary || "N/A",
+    }));
+  } catch (err) {
+    console.error("SerpAPI error:", err);
+    return [];
+  }
+}
+
 function handshakeSamples(): Job[] {
   return mockJobs
     .filter((j) => j.source === "Handshake")
@@ -182,13 +219,14 @@ function handshakeSamples(): Job[] {
 }
 
 export async function aggregateRemoteJobs(): Promise<Job[]> {
-  const [indeed, linkedin, google, hs] = await Promise.all([
+  const [indeed, linkedin, google, serp, hs] = await Promise.all([
     fetchIndeedJobs(4),
     fetchLinkedInRssJobs(3),
     fetchGoogleCareersJobs(3),
+    fetchSerpApiJobs(5),
     Promise.resolve(handshakeSamples()),
   ]);
-  const merged = [...google, ...indeed, ...linkedin, ...hs];
+  const merged = [...google, ...indeed, ...linkedin, ...hs, ...serp];
   const seen = new Set<string>();
   const deduped: Job[] = [];
   for (const j of merged) {

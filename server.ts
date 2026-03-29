@@ -10,7 +10,7 @@ import { scrapeLinkedInProfile, normalizeLinkedInUrl } from "./linkedinScrape.ts
 import { importLinkedInViaRelevance } from "./relevanceLinkedIn.ts";
 import { aggregateRemoteJobs } from "./jobsAggregator.ts";
 import type { UserProfile } from "./src/types/index.ts";
-import axios from "axios";
+
 
 async function startServer() {
   const app = express();
@@ -149,20 +149,6 @@ async function startServer() {
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 CareerPath AI Server running on http://localhost:${PORT}`);
   });
-
-  // server.ts (already implemented)
-const SERP_API_KEY = process.env.SERP_API_KEY;
-
-if (SERP_API_KEY) {
-  // Your app will now pull real Google Jobs!
-  const response = await axios.get('https://serpapi.com/search.json', {
-    params: {
-      engine: "google_jobs",
-      q: "software engineer intern",
-      api_key: SERP_API_KEY
-    }
-  });
-}
 
 }
 

@@ -204,7 +204,7 @@ export default function Home() {
                       <div className="w-6 h-6 rounded-lg bg-stone-50 flex items-center justify-center mr-3">
                         <DollarSign size={12} />
                       </div>
-                      <span>{job.pay}</span>
+                      <span>{job.pay || "N/A"}</span>
                     </div>
                     <div className="flex items-center text-stone-500 text-xs font-medium">
                       <div className="w-6 h-6 rounded-lg bg-stone-50 flex items-center justify-center mr-3">
