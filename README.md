@@ -12,7 +12,7 @@ CareerPath AI is an AI-powered career navigation platform designed specifically 
 
 - Multi-step onboarding flow (3 comprehensive steps)
 - Google Sign-in and Email/Password authentication
-- LinkedIn auto-fill simulation for quick profile setup
+- LinkedIn profile import (Relevance AI and/or public-page flow) for quicker profile setup
 - Complete profile data: experience, education, projects, research, skills
 
 ### 🔍 Job Discovery & Management
@@ -51,7 +51,7 @@ CareerPath AI is an AI-powered career navigation platform designed specifically 
 - View and edit all user information
 - Timeline view of experience and education
 - Skill management interface
-- Profile sync with LinkedIn (simulated)
+- LinkedIn URL import and profile fields (see server and `docs/` notes)
 
 ## Tech Stack
 
@@ -64,11 +64,13 @@ CareerPath AI is an AI-powered career navigation platform designed specifically 
 - **React Router v7** - Client-side routing
 - **Lucide Icons** - Beautiful icon library
 
-### Backend & Services
+### Backend & services
 
+- **Node.js + Express** (`server/`) - REST API for jobs and LinkedIn profile import; in development, the same process runs Vite in middleware mode for the React app
 - **Firebase Authentication** - Google OAuth, Email/Password
 - **Firestore** - Document database for user data
-- **Google Gemini API** - AI capabilities for content generation and analysis
+- **Google Gemini API** - AI capabilities for content generation and analysis (client uses `VITE_*` keys from env)
+- **Optional: Relevance AI** - Server-side webhook for structured LinkedIn import (`RELEVANCEAI_*` in `.env.local`, see `.env.example`)
 
 ### AI Services Integrated
 
@@ -83,40 +85,115 @@ CareerPath AI is an AI-powered career navigation platform designed specifically 
 - Firebase account with Firestore enabled
 - Google Gemini API key
 
-## How to Run
+## How to run
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Set Up Environment Variables
+### 2. Environment variables
 
-Create `.env` file with:
+Copy `.env.example` to `.env.local` and fill in values. The dev server loads `.env.local` from the project root (see `server/index.ts`). Vite only exposes variables prefixed with `VITE_` to browser code.
 
-```
-GEMINI_API_KEY=your_gemini_api_key
-VITE_FIREBASE_API_KEY=your_firebase_config
-# ... other Firebase config variables
-```
+Required for the client: `VITE_GEMINI_API_KEY`, `VITE_FIREBASE_*`, etc., as listed in `.env.example`. Optional server-only keys (LinkedIn import): `RELEVANCEAI_API_KEY`, `RELEVANCEAI_WEBHOOK_URL`.
 
-### 3. Start Development Server
+### 3. Start development (full stack)
 
 ```bash
 npm run dev
 ```
 
-The app will run on `http://localhost:5173`
+This runs **Express + Vite** together: the API and the React app share one process. Default URL is **`http://localhost:3000`** (override with `PORT`, bind address with `HOST`, e.g. `PORT=3001 npm run dev`).
 
-### 4. Build for Production
+### 4. Production frontend build
 
 ```bash
 npm run build
+```
+
+Output goes to `dist/`. Rollup bundle analysis (if enabled in `vite.config.ts`) is written under `reports/` (gitignored).
+
+### 5. Preview the static build only
+
+```bash
 npm run preview
 ```
 
-## Database Structure (Firestore)
+This is **Vite’s static preview** of `dist/` (no Express APIs). For local full-stack behavior, use `npm run dev`.
+
+### Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Express + Vite dev server (`tsx server/index.ts`) |
+| `npm run build` | Production Vite build → `dist/` |
+| `npm run preview` | Static preview of `dist/` |
+| `npm run lint` | TypeScript check (`tsc --noEmit`) |
+| `npm run clean` | Remove `dist/` (Unix-style `rm`; on Windows you can delete `dist` manually) |
+
+## Project structure
+
+The repo separates the **React client** (`src/`), the **Node server** (`server/`), and **config / docs** at the top level.
+
+### Top level
+
+| Path | Role |
+|------|------|
+| `index.html` | Vite HTML shell; loads `/src/main.tsx` |
+| `vite.config.ts` | React plugin, Tailwind, path alias `@` → repo root, bundle visualizer → `reports/bundle-analysis.html` |
+| `tsconfig.json` | TypeScript for `src/`, `server/`, and `vite.config.ts` |
+| `package.json` / `package-lock.json` | Dependencies and npm scripts |
+| `.env.example` | Documented template for `.env.local` |
+| `.env.local` | Local secrets (gitignored); not committed |
+
+### `src/` — frontend (React + Vite)
+
+| Path | Role |
+|------|------|
+| `main.tsx`, `App.tsx` | Bootstrap and app shell / routing |
+| `index.css` | Global styles (Tailwind v4) |
+| `firebase.ts` | Firebase client initialization |
+| `components/` | Shared UI: Navbar, Chatbot, job modals, document cards, etc. |
+| `pages/` | Route screens: Home, Search, Onboarding, My Jobs, Documents, Account |
+| `services/` | Client helpers (e.g. Gemini, LinkedIn-related calls) |
+| `utils/` | PDF export, document download, job links, transcript helpers |
+| `types/` | Shared TypeScript types (also imported by `server/` for API payloads) |
+| `data/` | Mock/sample data (e.g. jobs) |
+
+### `server/` — backend (Express)
+
+| File | Role |
+|------|------|
+| `index.ts` | Entrypoint: JSON API (`/api/health`, `/api/jobs`, LinkedIn import), Vite middleware in dev, static `dist/` + SPA fallback in production |
+| `jobsAggregator.ts` | Aggregates jobs from public RSS/APIs (e.g. Indeed, LinkedIn RSS, Google Careers) plus Handshake samples from mock data |
+| `linkedinScrape.ts` | Fallback scrape of public LinkedIn HTML when needed |
+| `relevanceLinkedIn.ts` | Relevance AI webhook integration for structured profile import |
+
+### `docs/` — documentation
+
+| File | Role |
+|------|------|
+| `IMPLEMENTATION_GUIDE.md` | Deeper feature / implementation notes |
+| `LINKEDIN_SCRAPING_AND_JOBS.txt` | Notes on LinkedIn and job sources |
+| `metadata.json` | Project metadata (e.g. tooling / studio manifests) |
+
+### `firebase/`
+
+| File | Role |
+|------|------|
+| `firestore.rules` | Firestore security rules (reference copy; point Firebase CLI here if you add `firebase.json`) |
+| `firebase-blueprint.json` | Firebase-oriented blueprint / config reference |
+
+### Generated folders
+
+| Path | Role |
+|------|------|
+| `dist/` | Output of `npm run build` (deploy or serve as static files) |
+| `reports/` | Bundle analysis HTML from Rollup visualizer (gitignored) |
+
+## Database structure (Firestore)
 
 ```
 users/{uid}
@@ -201,12 +278,12 @@ documents/{docId}
 
 ## Bugs & Known Issues
 
-### Current Limitations
+### Current limitations
 
-- Job listings are mocked (not connected to real APIs yet)
-- LinkedIn import is simulated, not real OAuth
-- Transcript parsing uses text analysis only (no actual transcript upload/parsing)
-- No payment system implemented
+- Jobs on the Home/Search flows combine **live public feeds** (e.g. Indeed RSS, LinkedIn job RSS, Google Careers API) with **Handshake samples** from mock data; behavior and availability depend on third-party endpoints
+- LinkedIn **profile import** uses Relevance AI and/or public-page scraping, not official LinkedIn OAuth
+- Transcript-related features use text analysis as implemented in the app (no full document pipeline described here)
+- No payment or billing
 
 ### Future Improvements
 
@@ -242,14 +319,16 @@ documents/{docId}
 
 ## Deployment
 
-### Firebase Hosting
+`npm run build` produces a static `dist/` folder. **Firebase Hosting** and **Vercel** typically serve that folder as a static site. Your **Express API** (`server/`) is separate: if you need `/api/*` in production, run Node (or another host) for the server and point the frontend’s API base URL accordingly, or deploy backend and frontend as separate services.
+
+### Firebase Hosting (static frontend)
 
 ```bash
 npm run build
 firebase deploy
 ```
 
-### Vercel (Alternative)
+### Vercel (static frontend)
 
 ```bash
 npm run build
@@ -269,13 +348,17 @@ vercel --prod
 │  └──────────────────────────────────────────────────────┘   │
 │                          ↓                                    │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │      React Router + Redux State Management           │   │
+│  │      React Router + client-side state               │   │
 │  └──────────────────────────────────────────────────────┘   │
 │                          ↓                                    │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │         Firebase Services                             │   │
+│  │  Express API (dev: + Vite) / static dist (prod)      │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                          ↓                                    │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │         Firebase + Gemini (client)                    │   │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────┐   │   │
-│  │  │ Auth (OAuth) │  │ Firestore DB │  │ Gemini AI│   │   │
+│  │  │ Auth         │  │ Firestore    │  │ Gemini   │   │   │
 │  │  └──────────────┘  └──────────────┘  └──────────┘   │   │
 │  └──────────────────────────────────────────────────────┘   │
 │                                                               │
@@ -295,7 +378,8 @@ For issues and contributions:
 
 For help, refer to:
 
-- [Implementation Guide](./IMPLEMENTATION_GUIDE.md) - Detailed feature documentation
+- [Implementation guide](./docs/IMPLEMENTATION_GUIDE.md) — feature documentation
+- [LinkedIn / jobs notes](./docs/LINKEDIN_SCRAPING_AND_JOBS.txt) — scraping and job sources
 - [Firebase Docs](https://firebase.google.com/docs)
 - [Google Gemini API](https://ai.google.dev/)
 - [React Documentation](https://react.dev)

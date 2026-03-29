@@ -9,7 +9,7 @@ import path from "path";
 import { scrapeLinkedInProfile, normalizeLinkedInUrl } from "./linkedinScrape.ts";
 import { importLinkedInViaRelevance } from "./relevanceLinkedIn.ts";
 import { aggregateRemoteJobs } from "./jobsAggregator.ts";
-import type { UserProfile } from "./src/types/index.ts";
+import type { UserProfile } from "../src/types/index.ts";
 
 async function startServer() {
   const app = express();
@@ -145,8 +145,9 @@ async function startServer() {
     process.exit(1);
   });
 
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 CareerPath AI Server running on http://localhost:${PORT}`);
+  const HOST = process.env.HOST ?? "0.0.0.0"
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`🚀 CareerPath AI Server running on http://${HOST}:${PORT}`);
   });
 }
 

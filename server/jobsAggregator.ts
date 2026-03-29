@@ -2,8 +2,8 @@
  * Server-side: aggregate job listings from public RSS/APIs.
  */
 import { XMLParser } from "fast-xml-parser";
-import type { Job } from "./src/types/index.ts";
-import { mockJobs } from "./src/data/mockJobs.ts";
+import type { Job } from "../src/types/index.ts";
+import { mockJobs } from "../src/data/mockJobs.ts";
 
 function hashId(s: string): string {
   let h = 0;

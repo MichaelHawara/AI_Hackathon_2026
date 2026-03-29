@@ -2,7 +2,7 @@
  * Relevance AI studio webhook: sends LinkedIn profile URL, receives structured/summary output.
  * @see https://relevanceai.com/docs/agent/build-your-agent/agent-triggers/custom-webhook
  */
-import type { Education, Experience, UserProfile } from "./src/types/index.ts";
+import type { Education, Experience, UserProfile } from "../src/types/index.ts";
 
 /** Must match Relevance → tool → Trigger webhook (shareable /form/... URL is not the API path). */
 const DEFAULT_WEBHOOK =

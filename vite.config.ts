@@ -10,7 +10,7 @@ export default defineConfig({
       tailwindcss(),
       visualizer({
         open: true,
-        filename: 'bundle-analysis.html',
+        filename: path.join('reports', 'bundle-analysis.html'),
       }),
     ],
     build: {
